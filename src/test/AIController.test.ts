@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AIController, AIContext } from "@/game/AIController";
 import { MAX_SHOT_SPEED } from "@/config/physics";
+import { Rng } from "@/game/Rng";
 
 function baseContext(overrides: Partial<AIContext> = {}): AIContext {
   return {
@@ -15,11 +16,12 @@ function baseContext(overrides: Partial<AIContext> = {}): AIContext {
       { uid: 5, index: 1, x: 1100, y: 450 },
       { uid: 6, index: 2, x: 1100, y: 600 },
     ],
-    ball: { x: 800, y: 450 },
+    clock: { x: 800, y: 450 },
     ownGoal: { x: 140, y: 450 },
     opponentGoal: { x: 1460, y: 450 },
     difficulty: "normal",
     turnNumber: 1,
+    panicLevel: 0,
     rng: () => 0.5, // deterministic: noise offsets become 0
     ...overrides,
   };
@@ -34,7 +36,7 @@ describe("AIController.computeShots", () => {
 
   it("never exceeds MAX_SHOT_SPEED", () => {
     for (let i = 0; i < 50; i++) {
-      const shots = AIController.computeShots(baseContext({ rng: Math.random }));
+      const shots = AIController.computeShots(baseContext({ rng: new Rng(i + 1).next.bind(new Rng(i + 1)) }));
       for (const s of shots) {
         expect(Math.hypot(s.vx, s.vy)).toBeLessThanOrEqual(MAX_SHOT_SPEED + 1e-9);
       }

@@ -87,6 +87,26 @@ describe("TurnManager", () => {
     expect(t.phase).toBe("AIMING");
   });
 
+  it("never settles before minResolveMs, even if everything is still (the clock is still running)", () => {
+    const t = tm({ settleStableTicks: 1, minResolveMs: 100, resolveMaxDurationMs: 10_000 });
+    t.setTeamReady("red");
+    t.setTeamReady("yellow");
+    t.update(30, [0]);
+    t.update(30, [0]);
+    expect(t.phase).toBe("RESOLVING");
+    t.update(60, [0]);
+    expect(t.phase).toBe("AIMING");
+  });
+
+  it("numbers turns from 1", () => {
+    const t = tm({ resolveMaxDurationMs: 10 });
+    expect(t.turnNumber).toBe(1);
+    t.setTeamReady("red");
+    t.setTeamReady("yellow");
+    t.update(20, [0]);
+    expect(t.turnNumber).toBe(2);
+  });
+
   it("clears pending aims and ready flags when a new aim phase starts", () => {
     const t = tm({ resolveMaxDurationMs: 10 });
     t.setAim(1, 5, 5);

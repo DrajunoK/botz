@@ -1,94 +1,128 @@
 import Phaser from "phaser";
+import { Body } from "@/game/util/matter";
 import { TeamId, TEAM_COLORS } from "@/config/game";
-import { BOT_RADIUS, BOT_PHYSICS } from "@/config/physics";
-import { drawBotIcon, roleForIndex } from "@/game/entities/botArt";
+import { BOT_RADIUS, BOT_PHYSICS, FIXED_TIMESTEP_MS } from "@/config/physics";
+import { PARTS, PartId } from "@/config/parts";
+import { BotParts } from "@/game/entities/BotParts";
+import { BotView } from "@/game/view/BotView";
+import { Rng } from "@/game/Rng";
+
 
 let nextBotUid = 1;
 
 /**
- * A round robot ("bot"). Physics body driven by Matter; visuals drawn with
- * Graphics so the look can later be swapped for sprites without touching
- * gameplay code (see `redraw`).
+ * A round robot ("botz"). Owns the Matter body and its parts; all drawing is delegated
+ * to BotView. Parts that fall off make it lighter, bend its trajectory or blur its aim.
  */
 export class Bot {
   readonly uid: number;
   readonly team: TeamId;
   readonly index: number;
-  readonly gameObject: Phaser.Physics.Matter.Sprite;
-  private graphics: Phaser.GameObjects.Graphics;
-  private shadow: Phaser.GameObjects.Graphics;
+  readonly parts = new BotParts();
+  readonly body: MatterJS.BodyType;
   /** Whether this bot currently has an aim arrow assigned for the upcoming resolution. */
   hasAim = false;
+
+  private readonly view: BotView;
+  private readonly baseMass: number;
+  private spin = 0;
+  private dragMultiplier = 1;
+  private dragRerollMs = 0;
 
   constructor(scene: Phaser.Scene, team: TeamId, index: number, x: number, y: number) {
     this.uid = nextBotUid++;
     this.team = team;
     this.index = index;
 
-    this.gameObject = scene.matter.add.sprite(x, y, "");
-    // No texture is loaded (V1 draws everything with Graphics, see redraw()),
-    // so hide Phaser's fallback "missing texture" checkerboard — the sprite
-    // still exists purely as the Matter physics body.
-    this.gameObject.setVisible(false);
-    this.gameObject.setCircle(BOT_RADIUS, {
+    this.body = scene.matter.add.circle(x, y, BOT_RADIUS, {
       restitution: BOT_PHYSICS.restitution,
       friction: BOT_PHYSICS.friction,
       frictionAir: BOT_PHYSICS.frictionAir,
       density: BOT_PHYSICS.density,
       label: `bot-${team}-${index}`,
-    });
-    this.gameObject.setFixedRotation();
+    }) as MatterJS.BodyType;
+    Body.setInertia(this.body, Infinity); // art is rotated for the spin gag only, physics never rotates
+    this.baseMass = this.body.mass;
+    (this.body as unknown as { botUid: number }).botUid = this.uid;
 
-    this.shadow = scene.add.graphics();
-    this.graphics = scene.add.graphics();
-    this.redraw();
+    this.view = new BotView(scene, TEAM_COLORS[team]);
+    this.view.setParts(this.parts);
   }
 
-  get body(): MatterJS.BodyType {
-    return this.gameObject.body as MatterJS.BodyType;
-  }
-
-  get position(): Phaser.Math.Vector2 {
-    return new Phaser.Math.Vector2(this.gameObject.x, this.gameObject.y);
-  }
-
-  get velocity(): { x: number; y: number } {
-    const v = this.body.velocity;
-    return { x: v.x, y: v.y };
+  get position(): { x: number; y: number } {
+    return { x: this.body.position.x, y: this.body.position.y };
   }
 
   get speed(): number {
-    const v = this.velocity;
-    return Math.hypot(v.x, v.y);
+    return Math.hypot(this.body.velocity.x, this.body.velocity.y);
   }
 
-  applyShotVelocity(vx: number, vy: number): void {
-    this.gameObject.setVelocity(vx, vy);
+  /**
+   * Launches the bot from its arrow. `vx, vy` is the player's intent; the actual velocity is
+   * bent by the missing parts (aim error) and boosted by the weight lost.
+   */
+  applyShot(vx: number, vy: number, rng: Rng): void {
+    const error = this.parts.aimErrorRad(rng);
+    const cos = Math.cos(error);
+    const sin = Math.sin(error);
+    const mult = this.parts.shotSpeedMultiplier;
+    Body.setVelocity(this.body, { x: (vx * cos - vy * sin) * mult, y: (vx * sin + vy * cos) * mult });
   }
 
-  /** Re-renders the bot body at its current physics position. Call every frame. */
-  syncVisuals(): void {
-    const x = this.gameObject.x;
-    const y = this.gameObject.y;
+  /** Advances part-dependent motion by one fixed step while bodies are in play. */
+  stepMotion(rng: Rng): void {
+    const speed = this.speed;
 
-    this.shadow.clear();
-    this.shadow.setPosition(x, y);
-    this.shadow.fillStyle(0x000000, 0.3);
-    this.shadow.fillEllipse(5, 10, BOT_RADIUS * 1.8, BOT_RADIUS * 0.95);
-    this.shadow.fillStyle(0x000000, 0.15);
-    this.shadow.fillEllipse(5, 10, BOT_RADIUS * 2.2, BOT_RADIUS * 1.2);
+    // Missing arms: the heading slowly curves.
+    const drift = this.parts.driftRate;
+    if (drift !== 0 && speed > PARTS.driftMinSpeed) {
+      const a = (drift * FIXED_TIMESTEP_MS) / 1000;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      const { x, y } = this.body.velocity;
+      Body.setVelocity(this.body, { x: x * c - y * s, y: x * s + y * c });
+    }
 
-    this.graphics.setPosition(x, y);
+    // Missing wheel: irregular braking.
+    if (!this.parts.has("wheel")) {
+      this.dragRerollMs -= FIXED_TIMESTEP_MS;
+      if (this.dragRerollMs <= 0) {
+        this.dragRerollMs = PARTS.wheelDragPeriodMs;
+        this.dragMultiplier = rng.range(PARTS.wheelDragMin, PARTS.wheelDragMax);
+      }
+      this.body.frictionAir = BOT_PHYSICS.frictionAir * this.dragMultiplier;
+      this.spin += PARTS.wheelSpinPerSpeed * speed * (FIXED_TIMESTEP_MS / 1000);
+    }
   }
 
-  private redraw(): void {
-    const facing = this.team === "red" ? 1 : -1;
-    drawBotIcon(this.graphics, TEAM_COLORS[this.team], BOT_RADIUS, facing, roleForIndex(this.index));
+  /** A part fell off: lighten the body and redraw. */
+  onPartLost(_part: PartId): void {
+    Body.setMass(this.body, this.baseMass * this.parts.massFactor);
+    this.view.setParts(this.parts);
+  }
+
+  repair(): void {
+    this.parts.repair();
+    Body.setMass(this.body, this.baseMass);
+    this.body.frictionAir = BOT_PHYSICS.frictionAir;
+    this.spin = 0;
+    this.view.setParts(this.parts);
+  }
+
+  /** Puts the bot back at a kickoff spot, at rest. */
+  placeAt(x: number, y: number): void {
+    Body.setPosition(this.body, { x, y });
+    Body.setVelocity(this.body, { x: 0, y: 0 });
+    Body.setAngularVelocity(this.body, 0);
+    this.spin = 0;
+  }
+
+  /** Re-renders at the current physics position. Call every frame. */
+  syncVisuals(timeSec: number): void {
+    this.view.sync(this.body.position.x, this.body.position.y, this.spin, timeSec);
   }
 
   destroy(): void {
-    this.gameObject.destroy();
-    this.graphics.destroy();
-    this.shadow.destroy();
+    this.view.destroy();
   }
 }

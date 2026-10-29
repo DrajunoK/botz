@@ -1,0 +1,16 @@
+/* Fonts from the design mockups (Google Fonts, SIL Open Font License 1.1 — see src/assets/fonts/LICENSE.txt). */
+@font-face {
+  font-family: "Bungee";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("./assets/fonts/bungee-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: block;
+  src: url("./assets/fonts/fredoka-latin.woff2") format("woff2");
+}

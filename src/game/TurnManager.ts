@@ -19,6 +19,8 @@ export interface ShotVector {
 export interface TurnManagerOptions {
   aimDurationMs?: number;
   resolveMaxDurationMs?: number;
+  /** The resolution never ends before this much time has passed (the alarm clock's run time). */
+  minResolveMs?: number;
   settleSpeedThreshold?: number;
   settleStableTicks?: number;
   goalsToWin?: number;
@@ -40,10 +42,12 @@ export class TurnManager extends EventEmitter {
   phase: TurnPhase = "AIMING";
   aimTimeRemainingMs: number;
   score: Record<TeamId, number> = { red: 0, yellow: 0 };
-  turnNumber = 0;
+  /** 1-based number of the current turn in the match. */
+  turnNumber = 1;
 
   private readonly aimDurationMs: number;
   private readonly resolveMaxDurationMs: number;
+  private readonly minResolveMs: number;
   private readonly settleSpeedThreshold: number;
   private readonly settleStableTicks: number;
   private readonly goalsToWin: number;
@@ -58,6 +62,7 @@ export class TurnManager extends EventEmitter {
     super();
     this.aimDurationMs = options.aimDurationMs ?? AIM_DURATION_MS;
     this.resolveMaxDurationMs = options.resolveMaxDurationMs ?? RESOLVE_MAX_DURATION_MS;
+    this.minResolveMs = options.minResolveMs ?? 0;
     this.settleSpeedThreshold = options.settleSpeedThreshold ?? SETTLE_SPEED_THRESHOLD;
     this.settleStableTicks = options.settleStableTicks ?? SETTLE_STABLE_TICKS;
     this.goalsToWin = options.goalsToWin ?? GOALS_TO_WIN;
@@ -118,7 +123,7 @@ export class TurnManager extends EventEmitter {
       const allSlow = speeds.every((s) => s <= this.settleSpeedThreshold);
       this.stableTickCount = allSlow ? this.stableTickCount + 1 : 0;
 
-      const settled = this.stableTickCount >= this.settleStableTicks;
+      const settled = this.stableTickCount >= this.settleStableTicks && this.resolveElapsedMs >= this.minResolveMs;
       const timedOut = this.resolveElapsedMs >= this.resolveMaxDurationMs;
       if (settled || timedOut) {
         this.emit("settled");

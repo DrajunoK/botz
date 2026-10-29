@@ -15,6 +15,7 @@
     "cap:ios": "npm run build && npx cap sync ios && npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/haptics": "^7.0.5",
     "phaser": "^3.90.0"
   },
   "devDependencies": {

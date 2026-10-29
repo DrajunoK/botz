@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { TeamId } from "@/config/game";
+import { RoundedRect } from "@/game/field/fieldGeometry";
 
 /**
  * Contract every mini-game mode implements. V1 ships only SoccerMode, but
@@ -16,12 +17,15 @@ export interface GameMode {
   /** Kickoff formation for a team's bots. */
   botSpawns(team: TeamId): { x: number; y: number }[];
 
-  /** Kickoff position for the ball. */
-  ballSpawn(): { x: number; y: number };
+  /** Kickoff position for the alarm clock (the ball). */
+  clockSpawn(): { x: number; y: number };
+
+  /** Outline of the playable area, used by the clock to follow walls. */
+  readonly fieldRect: RoundedRect;
 
   /** Reference point used by the AI to reason about "my goal" / "their goal". */
   goalCenterFor(team: TeamId): { x: number; y: number };
 
   /** Called every physics tick during RESOLVING; returns the scoring team, if any. */
-  checkScore(ballX: number, ballY: number, ballRadius: number): TeamId | null;
+  checkScore(x: number, y: number, radius: number): TeamId | null;
 }

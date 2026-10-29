@@ -53,6 +53,26 @@ class SFXPlayer {
     this.tone(140 + clamped * 90, 0.09, "square", 0.05 + clamped * 0.12);
   }
 
+  /** Metallic "clonk" of a part coming off. */
+  playClonk(): void {
+    this.tone(210, 0.12, "square", 0.16);
+    this.tone(95, 0.2, "triangle", 0.22, 0.03);
+    this.tone(1250, 0.05, "square", 0.05, 0.015);
+  }
+
+  /** Alarm bell ring, brighter and faster-paced with panic (0–3). */
+  playRing(level: number): void {
+    const f = 1500 + level * 160;
+    this.tone(f, 0.07, "square", 0.05 + level * 0.012);
+    this.tone(f * 1.26, 0.07, "square", 0.04 + level * 0.012, 0.075);
+  }
+
+  /** Dazed "bwoing" when a hard hit stuns the clock. */
+  playStun(): void {
+    this.tone(520, 0.25, "sine", 0.18);
+    this.tone(330, 0.3, "sine", 0.16, 0.1);
+  }
+
   playGoal(): void {
     const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
     notes.forEach((f, i) => this.tone(f, 0.28, "triangle", 0.22, i * 0.09));

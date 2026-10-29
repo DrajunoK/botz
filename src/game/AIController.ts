@@ -12,14 +12,16 @@ export interface AIContext {
   team: TeamId;
   bots: AIBotState[];
   opponentBots: AIBotState[];
-  ball: { x: number; y: number };
+  clock: { x: number; y: number };
   ownGoal: { x: number; y: number };
   opponentGoal: { x: number; y: number };
   difficulty: Difficulty;
   /** Incrementing turn counter, used to alternate the support bot's role. */
   turnNumber: number;
-  /** Injectable RNG (defaults to Math.random) so tests can be deterministic. */
-  rng?: () => number;
+  /** Alarm clock panic level (0–3): the higher, the further ahead of the clock the AI aims. */
+  panicLevel: number;
+  /** Source of randomness in [0, 1) — pass the match's seeded RNG so games stay reproducible. */
+  rng: () => number;
 }
 
 export interface AIShot {
@@ -39,6 +41,8 @@ const NOISE_BY_DIFFICULTY: Record<Difficulty, NoiseProfile> = {
   hard: { angleDeg: 5, power: 0.08 },
 };
 
+const FLEE_LEAD_PER_LEVEL = 45;
+
 function vecLen(x: number, y: number): number {
   return Math.hypot(x, y);
 }
@@ -56,11 +60,12 @@ function rotate(x: number, y: number, radians: number): { x: number; y: number }
 
 /**
  * Rule-based AI, no predictive physics: each bot aims at a target point derived
- * from the current (static) ball/goal geometry, with difficulty-scaled random noise.
+ * from the current (static) clock/goal geometry, with difficulty-scaled random noise.
+ * It does not compensate for missing parts: the trajectory distortion applies to it too.
  */
 export class AIController {
   static computeShots(ctx: AIContext): AIShot[] {
-    const rng = ctx.rng ?? Math.random;
+    const rng = ctx.rng;
     const noise = NOISE_BY_DIFFICULTY[ctx.difficulty];
     const shots: AIShot[] = [];
 
@@ -73,7 +78,7 @@ export class AIController {
       shots.push(this.aimAt(defender, this.defenderTarget(ctx), noise, rng));
     }
     if (attacker) {
-      shots.push(this.aimAt(attacker, this.attackerTarget(ctx), noise, rng));
+      shots.push(this.aimAt(attacker, this.attackerTarget(ctx, attacker, true), noise, rng));
     }
     if (support) {
       const supportTarget =
@@ -85,35 +90,48 @@ export class AIController {
   }
 
   /** Aim point just behind the ball, on the ball -> opponent-goal axis, so hitting it pushes it goalward. */
-  private static attackerTarget(ctx: AIContext, bot?: AIBotState): { x: number; y: number } {
-    const toGoal = normalize(ctx.opponentGoal.x - ctx.ball.x, ctx.opponentGoal.y - ctx.ball.y);
+  private static attackerTarget(ctx: AIContext, bot?: AIBotState, mainAttacker = false): { x: number; y: number } {
+    const toGoal = normalize(ctx.opponentGoal.x - ctx.clock.x, ctx.opponentGoal.y - ctx.clock.y);
     const behind = 46; // bot radius + ball radius + margin, approx.
-    let target = { x: ctx.ball.x - toGoal.x * behind, y: ctx.ball.y - toGoal.y * behind };
-    if (bot) {
+    let target = { x: ctx.clock.x - toGoal.x * behind, y: ctx.clock.y - toGoal.y * behind };
+    if (bot && !mainAttacker) {
       // Offset the support bot sideways so it doesn't collide with the main attacker's line.
       const side = normalize(-toGoal.y, toGoal.x);
-      const sign = bot.y >= ctx.ball.y ? 1 : -1;
+      const sign = bot.y >= ctx.clock.y ? 1 : -1;
       target = { x: target.x + side.x * 70 * sign, y: target.y + side.y * 70 * sign };
     }
-    return target;
+    return this.withFleeLead(ctx, target, bot);
+  }
+
+  /**
+   * The clock runs away from the nearest bot during the resolution, so at high panic the AI
+   * aims a bit further along the line from the bot through the clock.
+   */
+  private static withFleeLead(ctx: AIContext, target: { x: number; y: number }, bot?: AIBotState): { x: number; y: number } {
+    if (ctx.panicLevel <= 0) return target;
+    const from = bot ?? ctx.bots[1] ?? ctx.bots[0];
+    if (!from) return target;
+    const away = normalize(ctx.clock.x - from.x, ctx.clock.y - from.y);
+    const lead = ctx.panicLevel * FLEE_LEAD_PER_LEVEL;
+    return { x: target.x + away.x * lead, y: target.y + away.y * lead };
   }
 
   /** Positions the defender between the ball and its own goal, closer to the goal. */
   private static defenderTarget(ctx: AIContext): { x: number; y: number } {
     const t = 0.35;
     return {
-      x: ctx.ownGoal.x + (ctx.ball.x - ctx.ownGoal.x) * t,
-      y: ctx.ownGoal.y + (ctx.ball.y - ctx.ownGoal.y) * t,
+      x: ctx.ownGoal.x + (ctx.clock.x - ctx.ownGoal.x) * t,
+      y: ctx.ownGoal.y + (ctx.clock.y - ctx.ownGoal.y) * t,
     };
   }
 
   /** Aim towards the nearest opponent bot to the ball, to disrupt it. */
   private static harassTarget(ctx: AIContext, bot: AIBotState): { x: number; y: number } {
-    if (ctx.opponentBots.length === 0) return ctx.ball;
+    if (ctx.opponentBots.length === 0) return ctx.clock;
     let nearest = ctx.opponentBots[0];
     let bestDist = Infinity;
     for (const ob of ctx.opponentBots) {
-      const d = vecLen(ob.x - ctx.ball.x, ob.y - ctx.ball.y);
+      const d = vecLen(ob.x - ctx.clock.x, ob.y - ctx.clock.y);
       if (d < bestDist) {
         bestDist = d;
         nearest = ob;

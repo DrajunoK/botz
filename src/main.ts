@@ -1,15 +1,17 @@
 import Phaser from "phaser";
+import "./styles.css";
 import { GAME_WIDTH, GAME_HEIGHT } from "@/config/game";
 import { GRAVITY } from "@/config/physics";
 import { BootScene } from "@/scenes/BootScene";
 import { MenuScene } from "@/scenes/MenuScene";
 import { GameScene } from "@/scenes/GameScene";
 import { ResultScene } from "@/scenes/ResultScene";
+import { RankingScene } from "@/scenes/RankingScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "app",
-  backgroundColor: "#0d1117",
+  backgroundColor: "#141b31",
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -20,13 +22,13 @@ const config: Phaser.Types.Core.GameConfig = {
     default: "matter",
     matter: {
       gravity: GRAVITY,
-      // Fixed 60Hz physics step (see src/config/physics.ts) for reproducible
-      // simulation across devices/framerates.
-      runner: { fps: 60 },
+      // GameScene steps Matter itself with a fixed timestep (see src/config/physics.ts)
+      // so the simulation is reproducible across devices / framerates.
+      autoUpdate: false,
       debug: false,
     },
   },
-  scene: [BootScene, MenuScene, GameScene, ResultScene],
+  scene: [BootScene, MenuScene, GameScene, ResultScene, RankingScene],
 };
 
 new Phaser.Game(config);
