@@ -79,9 +79,13 @@ src/
   state/              settings.ts (sound, difficulty — persisted to localStorage)
 ```
 
-## Icon & splash screen
+## Website
 
-`resources/icon.png` and `resources/splash.png` are generated procedurally by `scripts/generate-assets.mjs` (a small from-scratch PNG encoder in `scripts/png.mjs` — no external image tools or network access needed), drawing the botz and the alarm clock in the same style as the mockups. Regenerate them, then re-run the platform asset generator, whenever the design changes:
+The public site (landing page, privacy policy) lives in the separate public repo `botz-site`, served at **https://botz.pomponlabs.com**. It is not part of this repo. Store listing, privacy declarations and release checklist: [`specs/publication.md`](specs/publication.md).
+
+## Icon, favicon & splash screen
+
+`resources/icon.png`, `resources/splash.png` and the web icons in `public/` (`favicon.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`) are generated procedurally by `scripts/generate-assets.mjs` (a small from-scratch PNG encoder in `scripts/png.mjs` — no external image tools or network access needed), drawing the botz and the alarm clock in the same style as the mockups. Regenerate them, then re-run the platform asset generator, whenever the design changes:
 
 ```bash
 node scripts/generate-assets.mjs

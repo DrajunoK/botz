@@ -2,7 +2,7 @@
 // PNGs (same look as the in-game botz and alarm clock, taken from the design
 // mockups in specs/), with no external image tooling or network access — see
 // png.mjs for the from-scratch PNG encoder.
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Canvas } from "./png.mjs";
 
 const BG = [20, 27, 49]; // #141b31
@@ -93,8 +93,54 @@ function buildSplash(size) {
   return canvas.toPNG();
 }
 
+/** Web icon: the bot's head close-up on a rounded tile, supersampled 4x so tiny sizes stay clean. */
+function buildWebIcon(size, { rounded = true } = {}) {
+  const ss = 4;
+  const big = size * ss;
+  const canvas = new Canvas(big, big);
+  const k = (big * 0.74) / 58; // bot spans ~58 units from antenna tip to wheel
+  if (rounded) canvas.fillRoundedRect(0, 0, big, big, big * 0.22, BG);
+  else canvas.fillRect(0, 0, big, big, BG);
+  drawBot(canvas, big / 2, big / 2 + 8 * k, k);
+  return downscale(canvas, ss).toPNG();
+}
+
+/** Box-filter downscale by an integer factor (premultiplied, so transparent corners stay clean). */
+function downscale(src, f) {
+  const out = new Canvas(src.width / f, src.height / f);
+  for (let y = 0; y < out.height; y++) {
+    for (let x = 0; x < out.width; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      for (let j = 0; j < f; j++) {
+        for (let i = 0; i < f; i++) {
+          const o = ((y * f + j) * src.width + x * f + i) * 4;
+          const w = src.data[o + 3];
+          r += src.data[o] * w;
+          g += src.data[o + 1] * w;
+          b += src.data[o + 2] * w;
+          a += w;
+        }
+      }
+      const o = (y * out.width + x) * 4;
+      if (a > 0) {
+        out.data[o] = Math.round(r / a);
+        out.data[o + 1] = Math.round(g / a);
+        out.data[o + 2] = Math.round(b / a);
+        out.data[o + 3] = Math.round(a / (f * f));
+      }
+    }
+  }
+  return out;
+}
+
+mkdirSync(new URL("../public/", import.meta.url), { recursive: true });
+writeFileSync(new URL("../public/favicon.png", import.meta.url), buildWebIcon(64));
+writeFileSync(new URL("../public/apple-touch-icon.png", import.meta.url), buildWebIcon(180, { rounded: false }));
+writeFileSync(new URL("../public/icon-192.png", import.meta.url), buildWebIcon(192));
+writeFileSync(new URL("../public/icon-512.png", import.meta.url), buildWebIcon(512));
+
 writeFileSync(new URL("../resources/icon.png", import.meta.url), buildIcon(1024));
 writeFileSync(new URL("../resources/splash.png", import.meta.url), buildSplash(2732));
 writeFileSync(new URL("../resources/splash-dark.png", import.meta.url), buildSplash(2732));
 
-console.log("Generated resources/icon.png, resources/splash.png, resources/splash-dark.png");
+console.log("Generated public/{favicon,apple-touch-icon,icon-192,icon-512}.png, resources/icon.png, resources/splash.png, resources/splash-dark.png");
