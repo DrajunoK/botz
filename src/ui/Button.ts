@@ -80,8 +80,10 @@ export function createButton(
   container.setSize(width, height + depth);
 
   const hitPad = 14;
+  // A container's hit area is in top-left-origin coords (it is offset by half its size),
+  // not centred on the container's position like the children drawn above.
   container.setInteractive(
-    new Phaser.Geom.Rectangle(-width / 2 - hitPad, -height / 2 - hitPad, width + hitPad * 2, height + depth + hitPad * 2),
+    new Phaser.Geom.Rectangle(-hitPad, -hitPad, width + hitPad * 2, height + depth + hitPad * 2),
     Phaser.Geom.Rectangle.Contains,
   );
   container.input!.cursor = "pointer";
