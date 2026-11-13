@@ -18,3 +18,8 @@ ios/App/output/
 ios/App/build/
 ios/App/DerivedData/
 ios/App/xcuserdata/
+
+# Private working files (not published)
+specs/
+.idea/
+.sbxw-artifacts/

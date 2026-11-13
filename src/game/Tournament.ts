@@ -1,6 +1,9 @@
 import { OPPOSITE_TEAM, TeamId } from "@/config/game";
 import { PartId } from "@/config/parts";
 import { GameId, defaultTournamentGames } from "@/config/tournament";
+import { Rng } from "@/game/Rng";
+import { newSeed } from "@/game/MatchConfig";
+import { newId } from "@/state/id";
 
 export interface GameResult {
   game: GameId;
@@ -10,7 +13,10 @@ export interface GameResult {
 }
 
 export interface TournamentOptions {
+  /** Explicit schedule; when absent, games are drawn at random with `rng`. */
   games?: readonly GameId[];
+  /** Source of the random draw (defaults to a fresh seed). */
+  rng?: Rng;
   /** Restore every lost part in the workshop between two games. */
   repairBetweenGames?: boolean;
 }
@@ -25,13 +31,15 @@ export const botKey = (team: TeamId, index: number): string => `${team}-${index}
  * trophy and the most trophies wins the tournament. Pure logic, no Phaser.
  */
 export class Tournament {
+  /** Identifies this tournament in the stats (its games point back to it). */
+  readonly id = newId();
   readonly games: readonly GameId[];
   readonly repairBetweenGames: boolean;
   private readonly played: GameResult[] = [];
   private carried: PartsSnapshot = {};
 
   constructor(options: TournamentOptions = {}) {
-    this.games = options.games ?? defaultTournamentGames();
+    this.games = options.games ?? defaultTournamentGames(options.rng ?? new Rng(newSeed()));
     this.repairBetweenGames = options.repairBetweenGames ?? true;
     if (this.games.length === 0) throw new Error("A tournament needs at least one game");
   }

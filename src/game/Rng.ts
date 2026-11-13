@@ -38,6 +38,16 @@ export class Rng {
     return items[this.int(items.length)];
   }
 
+  /** New array with the items in random order (Fisher-Yates). */
+  shuffle<T>(items: readonly T[]): T[] {
+    const out = [...items];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = this.int(i + 1);
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  }
+
   /** Independent generator derived from this one, so a subsystem's draws don't shift another's. */
   fork(): Rng {
     return new Rng(Math.floor(this.next() * 4294967296));

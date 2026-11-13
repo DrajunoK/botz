@@ -168,4 +168,19 @@ describe("TurnManager", () => {
     expect(t.aimTimeRemainingMs).toBe(1000);
     expect(t.hasAim(1)).toBe(true);
   });
+  it("lets a settled listener end the game instead of starting a new aim phase", () => {
+    const t = tm({ settleStableTicks: 1 });
+    const gameOverSpy = vi.fn();
+    const aimSpy = vi.fn();
+    t.on("gameOver", gameOverSpy);
+    t.on("aimPhaseStarted", aimSpy);
+    t.on("settled", () => t.endGame("yellow", { red: 0, yellow: 2 }));
+    t.setTeamReady("red");
+    t.setTeamReady("yellow");
+    t.update(16, [0]);
+    expect(t.phase).toBe("GAME_OVER");
+    expect(t.score).toEqual({ red: 0, yellow: 2 });
+    expect(gameOverSpy).toHaveBeenCalledWith("yellow");
+    expect(aimSpy).not.toHaveBeenCalled();
+  });
 });

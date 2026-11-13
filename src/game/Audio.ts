@@ -73,6 +73,13 @@ class SFXPlayer {
     this.tone(330, 0.3, "sine", 0.16, 0.1);
   }
 
+  /** Metallic "plouf" of a bot dropping into the lava. */
+  playSplash(): void {
+    this.tone(260, 0.18, "sine", 0.2);
+    this.tone(120, 0.3, "triangle", 0.22, 0.05);
+    this.tone(70, 0.35, "sine", 0.18, 0.12);
+  }
+
   playGoal(): void {
     const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
     notes.forEach((f, i) => this.tone(f, 0.28, "triangle", 0.22, i * 0.09));

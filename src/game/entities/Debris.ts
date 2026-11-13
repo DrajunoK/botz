@@ -54,6 +54,10 @@ export class Debris {
     return Math.hypot(this.body.velocity.x, this.body.velocity.y);
   }
 
+  get position(): { x: number; y: number } {
+    return { x: this.body.position.x, y: this.body.position.y };
+  }
+
   get isFading(): boolean {
     return this.fading;
   }
@@ -101,6 +105,16 @@ export class DebrisField {
       const old = alive[i];
       old.fadeOut(() => {
         this.items = this.items.filter((d) => d !== old);
+      });
+    }
+  }
+
+  /** Fades out every piece for which `pred` is true (e.g. fell in the lava). */
+  dropWhere(pred: (x: number, y: number) => boolean): void {
+    for (const d of this.items) {
+      if (d.isFading || !pred(d.position.x, d.position.y)) continue;
+      d.fadeOut(() => {
+        this.items = this.items.filter((i) => i !== d);
       });
     }
   }

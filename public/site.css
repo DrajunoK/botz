@@ -1,0 +1,19 @@
+@font-face { font-family: "Bungee"; src: url("/bungee-latin.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Fredoka"; src: url("/fredoka-latin.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+:root { --bg: #141b31; --card: #1d2640; --text: #e9edf7; --muted: #9aa5c2; --red: #e8473f; --pink: #ff6f91; --gold: #f4b942; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 18px/1.6 "Fredoka", system-ui, sans-serif; }
+a { color: var(--gold); }
+main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+h1, h2 { font-family: "Bungee", "Fredoka", sans-serif; font-weight: 400; line-height: 1.15; }
+h1 { font-size: clamp(2.4rem, 8vw, 4rem); margin: 0 0 8px; color: var(--red); }
+h2 { font-size: 1.4rem; margin: 40px 0 8px; color: var(--pink); }
+.hero { text-align: center; padding-top: 24px; }
+.hero img { width: min(420px, 90%); height: auto; }
+.tagline { color: var(--muted); font-size: 1.2rem; margin: 0 0 24px; }
+.card { background: var(--card); border-radius: 16px; padding: 4px 20px 16px; margin: 20px 0; }
+.card h2 { margin-top: 16px; }
+ul { padding-left: 1.2em; }
+footer { margin-top: 48px; color: var(--muted); font-size: .9rem; text-align: center; }
+nav { text-align: center; margin-top: 8px; }
+nav a { margin: 0 10px; }

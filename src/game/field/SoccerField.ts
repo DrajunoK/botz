@@ -1,10 +1,10 @@
 import Phaser from "phaser";
 import { GAME_WIDTH, GAME_HEIGHT, TeamId, BOTZ_PER_TEAM } from "@/config/game";
 import { WALL_PHYSICS } from "@/config/physics";
-import { COLORS, FONTS } from "@/config/theme";
-import { RoundedRect, halfHeightAt, wallInfo } from "@/game/field/fieldGeometry";
+import { COLORS } from "@/config/theme";
+import { RoundedRect, halfHeightAt } from "@/game/field/fieldGeometry";
+import { CREAM, addAds, addSign, fillRounded, paintCrowd, paintRim, strokeRounded } from "@/game/field/stadium";
 import { bakeTexture } from "@/game/view/bake";
-import { CROWD_TILE, CROWD_TILE_H, CROWD_TILE_W, paintSpectator } from "@/game/view/crowd";
 
 export const FIELD_LEFT = 190;
 export const FIELD_RIGHT = GAME_WIDTH - 190;
@@ -29,11 +29,6 @@ export const FIELD_RECT: RoundedRect = {
   bottom: FIELD_BOTTOM,
   radius: CORNER_RADIUS,
 };
-
-/** Workshop-bench rim around the pitch (holds the goal nets and the ads). */
-const RIM_RECT: RoundedRect = { left: 86, right: GAME_WIDTH - 86, top: 76, bottom: GAME_HEIGHT - 76, radius: 250 };
-/** Outer edge of the stands. */
-const CROWD_RECT: RoundedRect = { left: 6, right: GAME_WIDTH - 6, top: 6, bottom: GAME_HEIGHT - 6, radius: 300 };
 
 /** Liang–Barsky clip of a segment to a rectangle; null when nothing is left. */
 function clipSegment(x0: number, y0: number, x1: number, y1: number, left: number, top: number, right: number, bottom: number): [number, number, number, number] | null {
@@ -61,7 +56,6 @@ function clipSegment(x0: number, y0: number, x1: number, y1: number, left: numbe
 }
 
 const STRIPE_WIDTH = 44;
-const CROWD_SCALE = 1.45;
 const FIELD_TEXTURE_KEY = "botz-field-bg";
 
 export interface GoalZone {
@@ -204,13 +198,8 @@ export class SoccerField {
     g.fillStyle(COLORS.night, 1);
     g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    this.paintCrowd(g);
-
-    // Workshop rim.
-    g.fillStyle(COLORS.rim, 1);
-    this.fillRounded(g, RIM_RECT);
-    g.lineStyle(3, COLORS.outline, 1);
-    this.strokeRounded(g, RIM_RECT);
+    paintCrowd(g);
+    paintRim(g);
 
     this.paintGoalNet(g, this.leftGoal);
     this.paintGoalNet(g, this.rightGoal);
@@ -218,39 +207,9 @@ export class SoccerField {
     this.paintMarkings(g);
   }
 
-  private fillRounded(g: Phaser.GameObjects.Graphics, r: RoundedRect): void {
-    g.fillRoundedRect(r.left, r.top, r.right - r.left, r.bottom - r.top, r.radius);
-  }
-
-  private strokeRounded(g: Phaser.GameObjects.Graphics, r: RoundedRect): void {
-    g.strokeRoundedRect(r.left, r.top, r.right - r.left, r.bottom - r.top, r.radius);
-  }
-
-  /** Stands full of tiny robot spectators in team colors, tiled like the mockup's crowd pattern. */
-  private paintCrowd(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(COLORS.crowdBase, 1);
-    this.fillRounded(g, CROWD_RECT);
-    g.lineStyle(4, COLORS.outline, 1);
-    this.strokeRounded(g, CROWD_RECT);
-
-    const s = CROWD_SCALE;
-    const r = 9 * s;
-    for (let ty = -CROWD_TILE_H * s; ty < GAME_HEIGHT + CROWD_TILE_H * s; ty += CROWD_TILE_H * s) {
-      for (let tx = -CROWD_TILE_W * s; tx < GAME_WIDTH + CROWD_TILE_W * s; tx += CROWD_TILE_W * s) {
-        for (const [px, py, color] of CROWD_TILE) {
-          const x = tx + px * s;
-          const y = ty + py * s;
-          if (wallInfo(CROWD_RECT, x, y).distance < r + 4) continue; // outside the stands
-          if (wallInfo(RIM_RECT, x, y).distance > -r) continue; // would sit on the rim
-          paintSpectator(g, x, y, s, color);
-        }
-      }
-    }
-  }
-
   private paintTurf(g: Phaser.GameObjects.Graphics): void {
     g.fillStyle(COLORS.turfA, 1);
-    this.fillRounded(g, FIELD_RECT);
+    fillRounded(g, FIELD_RECT);
 
     // Alternate mow stripes, clipped to the rounded pitch by sampling its outline.
     g.fillStyle(COLORS.turfB, 1);
@@ -269,7 +228,7 @@ export class SoccerField {
     }
 
     g.lineStyle(8, COLORS.lineBorder, 1);
-    this.strokeRounded(g, FIELD_RECT);
+    strokeRounded(g, FIELD_RECT);
   }
 
   private paintMarkings(g: Phaser.GameObjects.Graphics): void {
@@ -328,42 +287,23 @@ export class SoccerField {
   }
 
   private addAds(): void {
-    const style = { fontFamily: FONTS.title, fontSize: "18px", color: COLORS.textFaint };
-    const ads: [string, number, number][] = [
+    addAds(this.scene, [
       ["BOULONS & FILS", 560, 103],
       ["HUILE EXTRA-FINE", 1040, 103],
       ["PIÈCES DÉTACHÉES", 560, GAME_HEIGHT - 103],
       ["RÉPARATION EXPRESS", 1040, GAME_HEIGHT - 103],
-    ];
-    for (const [label, x, y] of ads) {
-      this.scene.add.text(x, y, label, style).setOrigin(0.5).setDepth(-19);
-    }
+    ]);
   }
 
   /** Cream / yellow signs stuck on the stands, tilted like in the mockup. */
   private addCrowdSigns(): void {
-    const sign = (x: number, y: number, w: number, h: number, angleDeg: number, fill: number, lines: { text: string; color: string; size: number }[]) => {
-      const g = this.scene.add.graphics();
-      g.fillStyle(fill, 1);
-      g.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
-      g.lineStyle(3, COLORS.outline, 1);
-      g.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
-      const gap = h / (lines.length + 1);
-      const texts = lines.map((l, i) =>
-        this.scene.add
-          .text(0, -h / 2 + gap * (i + 1), l.text, { fontFamily: FONTS.title, fontSize: `${l.size}px`, color: l.color })
-          .setOrigin(0.5),
-      );
-      this.scene.add.container(x, y, [g, ...texts]).setAngle(angleDeg).setDepth(-18);
-    };
-    const cream = 0xfff7ea;
-    sign(520, 40, 180, 38, -3, cream, [{ text: "DRIIING !", color: "#d63a33", size: 20 }]);
-    sign(1120, 40, 210, 38, 3, cream, [{ text: "RENDS TA ROUE", color: COLORS.ink, size: 18 }]);
-    sign(48, 380, 86, 66, -7, cream, [
+    addSign(this.scene, 520, 40, 180, 38, -3, CREAM, [{ text: "DRIIING !", color: "#d63a33", size: 20 }]);
+    addSign(this.scene, 1120, 40, 210, 38, 3, CREAM, [{ text: "RENDS TA ROUE", color: COLORS.ink, size: 18 }]);
+    addSign(this.scene, 48, 380, 86, 66, -7, CREAM, [
       { text: "GO", color: "#d63a33", size: 20 },
       { text: "ROUGE", color: "#d63a33", size: 16 },
     ]);
-    sign(GAME_WIDTH - 48, 520, 86, 66, 6, COLORS.yellow, [
+    addSign(this.scene, GAME_WIDTH - 48, 520, 86, 66, 6, COLORS.yellow, [
       { text: "GO", color: COLORS.ink, size: 20 },
       { text: "JAUNE", color: COLORS.ink, size: 16 },
     ]);

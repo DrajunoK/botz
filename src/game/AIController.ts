@@ -30,12 +30,12 @@ export interface AIShot {
   vy: number;
 }
 
-interface NoiseProfile {
+export interface NoiseProfile {
   angleDeg: number;
   power: number;
 }
 
-const NOISE_BY_DIFFICULTY: Record<Difficulty, NoiseProfile> = {
+export const NOISE_BY_DIFFICULTY: Record<Difficulty, NoiseProfile> = {
   easy: { angleDeg: 26, power: 0.4 },
   normal: { angleDeg: 13, power: 0.2 },
   hard: { angleDeg: 5, power: 0.08 },

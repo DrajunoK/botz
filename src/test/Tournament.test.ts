@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Tournament, botKey } from "@/game/Tournament";
-import { defaultTournamentGames } from "@/config/tournament";
+import { defaultTournamentGames, TOURNAMENT_SIZE } from "@/config/tournament";
+import { Rng } from "@/game/Rng";
 
 const ALL = ["soccer", "survivor", "petanque"] as const;
 const win = (game: (typeof ALL)[number], winner: "red" | "yellow", w = 2, l = 1) => ({
@@ -63,8 +64,25 @@ describe("Tournament", () => {
   });
 
   it("only schedules playable games by default", () => {
-    const t = new Tournament();
-    expect(t.games).toEqual(defaultTournamentGames());
+    const t = new Tournament({ rng: new Rng(1) });
+    expect(t.games).toEqual(defaultTournamentGames(new Rng(1)));
     expect(t.games.length).toBeGreaterThan(0);
+  });
+
+  it("draws a random order of distinct games, at most TOURNAMENT_SIZE", () => {
+    const pool = ["soccer", "survivor", "petanque", "extra"] as never[];
+    const orders = new Set<string>();
+    for (let seed = 1; seed <= 40; seed++) {
+      const games = defaultTournamentGames(new Rng(seed), pool);
+      expect(games).toHaveLength(TOURNAMENT_SIZE);
+      expect(new Set(games).size).toBe(games.length);
+      orders.add(games.join());
+    }
+    expect(orders.size).toBeGreaterThan(1);
+  });
+
+  it("draws the same schedule from the same seed", () => {
+    const pool = ["soccer", "survivor", "petanque"] as const;
+    expect(defaultTournamentGames(new Rng(7), pool)).toEqual(defaultTournamentGames(new Rng(7), pool));
   });
 });

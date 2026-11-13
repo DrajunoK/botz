@@ -1,10 +1,11 @@
 import Phaser from "phaser";
 import { FONTS } from "@/config/theme";
 import { SceneKeys } from "./keys";
-import { TOURNAMENT_ORDER } from "@/config/tournament";
+import { ALL_GAMES } from "@/config/tournament";
 import { Tournament } from "@/game/Tournament";
 import type { MatchConfig } from "@/game/MatchConfig";
 import type { RankingData } from "./RankingScene";
+import { syncStats } from "@/net/cloud";
 
 /**
  * Everything is drawn with Graphics, so the only thing to wait for is the two web fonts:
@@ -16,6 +17,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    void syncStats(); // upload games finished while offline
     const start = () => (import.meta.env.DEV && this.startPreview()) || this.scene.start(SceneKeys.Menu);
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (!fonts) {
@@ -32,7 +34,7 @@ export class BootScene extends Phaser.Scene {
   private startPreview(): boolean {
     const target = window.location.hash;
     if (target !== "#ranking" && target !== "#final") return false;
-    const tournament = new Tournament({ games: TOURNAMENT_ORDER });
+    const tournament = new Tournament({ games: ALL_GAMES });
     tournament.record({ game: "soccer", winner: "red", score: { red: 2, yellow: 1 } });
     if (target === "#final") {
       tournament.record({ game: "survivor", winner: "yellow", score: { red: 0, yellow: 1 } });

@@ -13,6 +13,7 @@ export class BotView {
   private readonly body: Phaser.GameObjects.Graphics;
   private readonly smoke: Phaser.GameObjects.Graphics;
   private wreck = false;
+  private lastState!: BotArtState;
 
   constructor(
     scene: Phaser.Scene,
@@ -26,6 +27,7 @@ export class BotView {
 
   /** Redraws the shell and parts (call when a part falls off). */
   setParts(state: BotArtState): void {
+    this.lastState = state;
     drawBot(this.body, this.color, state);
     this.wreck = state.isWreck;
     if (!this.wreck) this.smoke.clear();
@@ -38,6 +40,27 @@ export class BotView {
       this.smoke.setPosition(x, y);
       drawSmoke(this.smoke, timeSec);
     }
+  }
+
+  /** Shrinks the bot away (it fell in the lava), then hides it. */
+  fall(scene: Phaser.Scene, durationMs: number): void {
+    this.smoke.setVisible(false);
+    scene.tweens.add({
+      targets: [this.shadow, this.body],
+      scale: 0,
+      alpha: 0,
+      duration: durationMs,
+      ease: "Quad.In",
+      onComplete: () => this.setVisible(false),
+    });
+  }
+
+  /** Back to full size and visible, e.g. when sudden death brings a bot back. */
+  reset(): void {
+    this.shadow.setScale(ART_SCALE).setAlpha(1);
+    this.body.setScale(ART_SCALE).setAlpha(1);
+    this.setVisible(true);
+    this.setParts(this.lastState);
   }
 
   setVisible(visible: boolean): void {

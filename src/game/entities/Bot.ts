@@ -22,6 +22,8 @@ export class Bot {
   readonly body: MatterJS.BodyType;
   /** Whether this bot currently has an aim arrow assigned for the upcoming resolution. */
   hasAim = false;
+  /** True while the bot is out of play: fallen in the lava (Survivant) or waiting its turn (Pétanque). */
+  eliminated = false;
 
   private readonly view: BotView;
   private readonly baseMass: number;
@@ -93,6 +95,41 @@ export class Bot {
       this.body.frictionAir = BOT_PHYSICS.frictionAir * this.dragMultiplier;
       this.spin += PARTS.wheelSpinPerSpeed * speed * (FIXED_TIMESTEP_MS / 1000);
     }
+  }
+
+  /**
+   * Takes the bot out of the game: it keeps sliding for the fall animation but no longer collides,
+   * then leaves the physics world.
+   */
+  eliminate(scene: Phaser.Scene, fallMs: number): void {
+    if (this.eliminated) return;
+    this.eliminated = true;
+    this.hasAim = false;
+    this.body.isSensor = true;
+    this.view.fall(scene, fallMs);
+    scene.time.delayedCall(fallMs, () => {
+      if (this.eliminated) scene.matter.world.remove(this.body);
+    });
+  }
+
+  /** Sets the bot aside at once: no body, no picture, until `revive`. */
+  bench(scene: Phaser.Scene): void {
+    this.eliminated = true;
+    this.hasAim = false;
+    this.body.isSensor = true;
+    scene.matter.world.remove(this.body);
+    this.view.setVisible(false);
+  }
+
+  /** Brings an out-of-play bot back at (x, y), repaired unless `repair` is false. */
+  revive(scene: Phaser.Scene, x: number, y: number, repair = true): void {
+    if (!this.eliminated) return;
+    this.eliminated = false;
+    this.body.isSensor = false;
+    scene.matter.world.add(this.body);
+    if (repair) this.repair();
+    this.placeAt(x, y);
+    this.view.reset();
   }
 
   /** A part fell off: lighten the body and redraw. */

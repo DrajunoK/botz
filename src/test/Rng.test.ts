@@ -33,4 +33,11 @@ describe("Rng", () => {
     b.next();
     expect(forkB.next()).toBe(first);
   });
+
+  it("shuffles into a permutation without touching the input", () => {
+    const input = [1, 2, 3, 4, 5, 6];
+    const out = new Rng(3).shuffle(input);
+    expect(input).toEqual([1, 2, 3, 4, 5, 6]);
+    expect([...out].sort()).toEqual(input);
+  });
 });

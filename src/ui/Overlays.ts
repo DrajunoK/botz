@@ -105,6 +105,34 @@ export function playPartLostBurst(scene: Phaser.Scene, x: number, y: number): vo
 }
 
 /** Full-screen flash, team-colored burst and a big "BUT !" that pops in. */
+/** A bot fell in the lava: orange droplets, an expanding ring and "PLOUF !". */
+export function playLavaSplash(scene: Phaser.Scene, x: number, y: number): void {
+  const ring = scene.add.graphics().setDepth(140).setPosition(x, y);
+  ring.lineStyle(5, COLORS.lavaGlow, 1);
+  ring.strokeCircle(0, 0, 26);
+  scene.tweens.add({ targets: ring, scale: 2.6, alpha: 0, duration: 650, ease: "Quad.Out", onComplete: () => ring.destroy() });
+
+  for (let i = 0; i < 9; i++) {
+    const angle = fxRng.range(-Math.PI * 0.95, -Math.PI * 0.05);
+    const dist = fxRng.range(40, 95);
+    const drop = scene.add.graphics().setDepth(141).setPosition(x, y);
+    drop.fillStyle(i % 2 === 0 ? COLORS.lavaGlow : COLORS.lavaLight, 1);
+    drop.fillCircle(0, 0, fxRng.range(4, 8));
+    scene.tweens.add({
+      targets: drop,
+      x: x + Math.cos(angle) * dist,
+      y: [y + Math.sin(angle) * dist, y + 20],
+      alpha: 0,
+      duration: 700,
+      ease: "Quad.Out",
+      onComplete: () => drop.destroy(),
+    });
+  }
+
+  const text = scene.add.text(x, y - 40, "PLOUF !", titleText(26, "#ffffff")).setOrigin(0.5).setDepth(142).setStroke("#7a2a14", 7).setAngle(-8);
+  scene.tweens.add({ targets: text, y: y - 100, alpha: 0, duration: 900, ease: "Quad.Out", onComplete: () => text.destroy() });
+}
+
 export function playGoalFlash(scene: Phaser.Scene, team: TeamId, x: number, y: number): void {
   const color = TEAM_COLORS[team];
 

@@ -8,7 +8,8 @@ import { card } from "@/ui/Overlays";
 import { SettingsStore } from "@/state/settings";
 import { MatchConfig, newSeed } from "@/game/MatchConfig";
 import { Tournament } from "@/game/Tournament";
-import { GAME_INFO, GameId, PLAYABLE_GAMES, TOURNAMENT_ORDER } from "@/config/tournament";
+import { ALL_GAMES, GAME_INFO, GameId, PLAYABLE_GAMES, TOURNAMENT_SIZE } from "@/config/tournament";
+import { Rng } from "@/game/Rng";
 import { BotParts } from "@/game/entities/BotParts";
 import { drawAntenna, drawBot, drawBotShadow } from "@/game/view/botArt";
 import { drawAlarmClock, drawClockShadow } from "@/game/view/alarmClockArt";
@@ -30,6 +31,7 @@ const MENU_TEXTURE_KEY = "botz-menu-bg";
 export class MenuScene extends Phaser.Scene {
   private settingsPanel?: Phaser.GameObjects.Container;
   private freePlayPanel?: Phaser.GameObjects.Container;
+  private tournamentPanel?: Phaser.GameObjects.Container;
   private freePlayGame: GameId = PLAYABLE_GAMES[0];
   private clockG!: Phaser.GameObjects.Graphics;
   private clockShadow!: Phaser.GameObjects.Graphics;
@@ -43,6 +45,7 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     this.settingsPanel = undefined;
     this.freePlayPanel = undefined;
+    this.tournamentPanel = undefined;
     bakeTexture(this, MENU_TEXTURE_KEY, GAME_WIDTH, GAME_HEIGHT, (g) => this.paintBackground(g));
     this.add.image(0, 0, MENU_TEXTURE_KEY).setOrigin(0, 0).setDepth(-20);
 
@@ -212,7 +215,7 @@ export class MenuScene extends Phaser.Scene {
     shadow.setDepth(1);
     title.setDepth(2);
     this.add
-      .text(x, Y(126), "Foot, Survivant, Pétanque : un tournoi de petits robots qui perdent leurs pièces.", {
+      .text(x, Y(126), "Foot, Survivant, Pétanque : des mini-jeux de petits robots qui perdent leurs pièces.", {
         ...bodyText(Math.round(15 * S), COLORS.textSoft, "400"),
         wordWrap: { width: X(300) },
         lineSpacing: 6,
@@ -224,31 +227,30 @@ export class MenuScene extends Phaser.Scene {
     const left = X(48);
     const w = X(270);
     const h = 52 * S;
-    createButton(this, left + w / 2, Y(186 + 26), "Jouer en solo", () => this.startTournament("solo"), {
+    createButton(this, left + w / 2, Y(186 + 26), "Tournoi", () => this.toggleTournament(), {
       variant: "primary",
       width: w,
       height: h,
       fontSize: Math.round(19 * S),
     });
-    createButton(this, left + w / 2, Y(250 + 26), "2 joueurs · même téléphone", () => this.startTournament("passPlay"), {
+    createButton(this, left + w / 2, Y(250 + 26), "Jeu simple", () => this.toggleFreePlay(), {
       variant: "danger",
       width: w,
       height: h,
-      fontSize: Math.round(17 * S),
+      fontSize: Math.round(19 * S),
     });
     const gap = X(10);
     const soundW = h;
-    const rowW = (w - soundW - gap * 2) / 2;
     const rowY = Y(314 + 26);
-    createButton(this, left + rowW / 2, rowY, "Réglages", () => this.toggleSettings(), {
+    createButton(this, left + w / 2, Y(378 + 26), "Stats", () => this.scene.start(SceneKeys.Stats), {
       variant: "ghost",
-      width: rowW,
+      width: w,
       height: h,
       fontSize: Math.round(15 * S),
     });
-    createButton(this, left + rowW + gap + rowW / 2, rowY, "Partie libre", () => this.toggleFreePlay(), {
+    createButton(this, left + (w - soundW - gap) / 2, rowY, "Réglages", () => this.toggleSettings(), {
       variant: "ghost",
-      width: rowW,
+      width: w - soundW - gap,
       height: h,
       fontSize: Math.round(15 * S),
     });
@@ -276,11 +278,50 @@ export class MenuScene extends Phaser.Scene {
 
   // ───────────────────────────── navigation ─────────────────────────────
 
-  /** Full tournament: every game of the fixed order, with a ranking screen in between. */
+  /** Tournament: games drawn at random, in random order, with a ranking screen in between. */
   private startTournament(mode: MatchConfig["mode"]): void {
-    const tournament = new Tournament();
-    const config: MatchConfig = { mode, difficulty: SettingsStore.get().difficulty, seed: newSeed(), gameId: tournament.currentGame!, tournament };
+    const seed = newSeed();
+    const tournament = new Tournament({ rng: new Rng(seed) });
+    const config: MatchConfig = { mode, difficulty: SettingsStore.get().difficulty, seed, gameId: tournament.currentGame!, tournament };
     this.scene.start(SceneKeys.Game, config);
+  }
+
+  private toggleTournament(): void {
+    if (this.tournamentPanel) {
+      this.tournamentPanel.destroy();
+      this.tournamentPanel = undefined;
+      return;
+    }
+    this.tournamentPanel = this.buildTournamentPanel();
+  }
+
+  private buildTournamentPanel(): Phaser.GameObjects.Container {
+    const panelW = 900;
+    const panelH = 440;
+    const cx = GAME_WIDTH / 2;
+    const cy = GAME_HEIGHT / 2;
+
+    const dim = this.add.graphics();
+    dim.fillStyle(0x070a16, 0.72);
+    dim.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    dim.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+
+    const count = Math.min(TOURNAMENT_SIZE, PLAYABLE_GAMES.length);
+    const elements: Phaser.GameObjects.GameObject[] = [dim, card(this, cx, cy, panelW, panelH)];
+    elements.push(this.add.text(cx, cy - panelH / 2 + 60, "TOURNOI", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));
+    elements.push(
+      this.add
+        .text(cx, cy - panelH / 2 + 118, `${count} jeu${count > 1 ? "x" : ""} tirés au hasard, dans un ordre aléatoire.\nLe plus de trophées gagne.`, {
+          ...bodyText(24, COLORS.textMuted, "500"),
+          align: "center",
+        })
+        .setOrigin(0.5),
+    );
+    elements.push(createButton(this, cx - 200, cy + 50, "Solo", () => this.startTournament("solo"), { width: 340, height: 70, fontSize: 28, variant: "primary" }));
+    elements.push(createButton(this, cx + 200, cy + 50, "2 joueurs", () => this.startTournament("passPlay"), { width: 340, height: 70, fontSize: 28, variant: "danger" }));
+    elements.push(createButton(this, cx, cy + panelH / 2 - 44, "Fermer", () => this.toggleTournament(), { width: 200, height: 52, fontSize: 24, variant: "ghost" }));
+
+    return this.add.container(0, 0, elements).setDepth(500);
   }
 
   /** Free play: a single game, no tournament. */
@@ -310,11 +351,11 @@ export class MenuScene extends Phaser.Scene {
     dim.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
 
     const elements: Phaser.GameObjects.GameObject[] = [dim, card(this, cx, cy, panelW, panelH)];
-    elements.push(this.add.text(cx, cy - panelH / 2 + 60, "PARTIE LIBRE", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));
-    elements.push(this.add.text(cx, cy - panelH / 2 + 112, "Un seul jeu, pour s'entraîner", bodyText(24, COLORS.textMuted, "500")).setOrigin(0.5));
+    elements.push(this.add.text(cx, cy - panelH / 2 + 60, "JEU SIMPLE", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));
+    elements.push(this.add.text(cx, cy - panelH / 2 + 112, "Choisis un jeu, sans tournoi", bodyText(24, COLORS.textMuted, "500")).setOrigin(0.5));
 
-    TOURNAMENT_ORDER.forEach((game, i) => {
-      const x = cx + (i - 1) * 270;
+    ALL_GAMES.forEach((game, i) => {
+      const x = cx + (i - (ALL_GAMES.length - 1) / 2) * 270;
       const playable = PLAYABLE_GAMES.includes(game);
       const selected = playable && this.freePlayGame === game;
       const label = playable ? GAME_INFO[game].name : `${GAME_INFO[game].name} · bientôt`;

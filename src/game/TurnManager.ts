@@ -33,7 +33,7 @@ export interface TurnManagerOptions {
  *
  * Events emitted:
  *  - "resolve" (shots: ShotVector[])   -> caller should apply impulses to bodies
- *  - "settled"                         -> resolution finished naturally (or timed out)
+ *  - "settled"                         -> resolution finished naturally (or timed out); a listener may call endGame()
  *  - "goal" (team: TeamId)             -> a goal was scored by `team`
  *  - "gameOver" (winner: TeamId)       -> match is over
  *  - "aimPhaseStarted"
@@ -127,7 +127,8 @@ export class TurnManager extends EventEmitter {
       const timedOut = this.resolveElapsedMs >= this.resolveMaxDurationMs;
       if (settled || timedOut) {
         this.emit("settled");
-        this.startAimPhase();
+        // A "settled" listener may have ended the game (e.g. last bot of a team eliminated).
+        if (this.phase === "RESOLVING") this.startAimPhase();
       }
       return;
     }
@@ -142,11 +143,29 @@ export class TurnManager extends EventEmitter {
     this.emit("goal", scoringTeam);
 
     if (this.score[scoringTeam] >= this.goalsToWin) {
-      this.phase = "GAME_OVER";
-      this.emit("gameOver", scoringTeam);
+      this.endGame(scoringTeam);
     } else {
       this.phase = "GOAL_PAUSE";
     }
+  }
+
+  /**
+   * Ends the match for modes that are not decided by reaching a score (e.g. last team standing).
+   * `finalScore` replaces the running score so the ranking shows a meaningful result.
+   */
+  endGame(winner: TeamId, finalScore?: Record<TeamId, number>): void {
+    if (this.phase === "GAME_OVER") return;
+    if (finalScore) this.score = { ...finalScore };
+    this.phase = "GAME_OVER";
+    this.emit("gameOver", winner);
+  }
+
+  /**
+   * Holds the game between two turns (an end-of-round animation) instead of starting the next aim
+   * phase; `resumeAfterGoal()` then continues. Meant to be called from a "settled" listener.
+   */
+  pause(): void {
+    if (this.phase === "RESOLVING") this.phase = "GOAL_PAUSE";
   }
 
   /** Called once the goal celebration + reset-to-kickoff has finished. */

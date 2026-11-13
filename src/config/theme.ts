@@ -31,6 +31,22 @@ export const COLORS = {
   line: 0xf4f7fb,
   lineBorder: 0xeef2f7,
 
+  // Pétanque: gravel court and wooden border
+  gravel: 0xd9c49a,
+  gravelPebble: 0xbfa97c,
+  wood: 0xa8703a,
+  woodDark: 0x7a4f26,
+
+  // Survivant: lava lake and metal catwalk
+  lava: 0xe8572a,
+  lavaLight: 0xf28a3a,
+  lavaGlow: 0xffb547,
+  lavaDark: 0x7a2a14,
+  catwalkEdge: 0x7b8499,
+  catwalkRing: 0x5a6480,
+  catwalkPlate: 0xaab3c8,
+  catwalkGrid: 0x929cb4,
+
   // Botz
   botVisor: 0x1f2438,
   botEye: 0x8ff3ff,

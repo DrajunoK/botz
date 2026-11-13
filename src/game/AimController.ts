@@ -4,7 +4,6 @@ import { TurnManager } from "@/game/TurnManager";
 import { chevronColor, chevronCount, chevronPolygon, computeAim } from "@/game/aiming";
 import { BOT_RADIUS, MAX_AIM_DISTANCE } from "@/config/physics";
 import { COLORS } from "@/config/theme";
-import { Haptics, ImpactStyle } from "@capacitor/haptics";
 
 const HIT_RADIUS = BOT_RADIUS * 1.4;
 
@@ -32,6 +31,9 @@ export class AimController {
   private readonly onDown = (p: Phaser.Input.Pointer) => this.handleDown(p);
   private readonly onMove = (p: Phaser.Input.Pointer) => this.handleMove(p);
   private readonly onUp = (p: Phaser.Input.Pointer) => this.handleUp(p);
+
+  /** Which botz can be aimed right now (modes like Pétanque only let the newly thrown bot be aimed). */
+  canAim: (bot: Bot) => boolean = (bot) => !bot.eliminated;
 
   /** Called whenever an arrow is set or cleared (drives the "n/3 ready" hint). */
   onAimChange?: () => void;
@@ -90,6 +92,7 @@ export class AimController {
     if (!this.enabled || this.turnManager.phase !== "AIMING") return;
     const world = this.toWorld(pointer);
     for (const bot of this.bots) {
+      if (!this.canAim(bot)) continue;
       if (Phaser.Math.Distance.Between(world.x, world.y, bot.position.x, bot.position.y) <= HIT_RADIUS) {
         this.activeUid = bot.uid;
         this.lastLit = 0;
@@ -201,7 +204,7 @@ export class AimController {
   /** Light haptic tick each time a chevron is added while dragging. */
   private notifyPower(uid: number, count: number): void {
     if (uid !== this.activeUid || count === this.lastLit) return;
-    if (count > this.lastLit) void Haptics.impact({ style: ImpactStyle.Light }).catch(() => undefined);
+    if (count > this.lastLit) navigator.vibrate?.(10); // no-op on iOS Safari
     this.lastLit = count;
   }
 }
