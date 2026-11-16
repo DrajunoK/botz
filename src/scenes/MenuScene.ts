@@ -60,7 +60,7 @@ export class MenuScene extends Phaser.Scene {
     // Version tag.
     const tag = this.add.graphics();
     drawPill(tag, GAME_WIDTH - 24 - 230, GAME_HEIGHT - 20 - 40, 230, 40, 14);
-    this.add.text(GAME_WIDTH - 24 - 115, GAME_HEIGHT - 40, "v0.1 · prototype", bodyText(20, COLORS.textMuted, "500")).setOrigin(0.5);
+    this.add.text(GAME_WIDTH - 24 - 115, GAME_HEIGHT - 40, "v0.2 · prototype", bodyText(20, COLORS.textMuted, "500")).setOrigin(0.5);
   }
 
   update(_time: number, delta: number): void {
