@@ -7,6 +7,8 @@ import { createButton } from "@/ui/Button";
 import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
 import { Stats, Tally, summarize } from "@/state/stats";
 import { BoardRow, FriendStats, Profile, addFriend, fetchFriends, fetchLeaderboard, fetchProfile, setNickname, syncStats } from "@/net/cloud";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
+import { centerOnDesignArea } from "@/ui/viewport";
 
 type Tab = "me" | "friends" | "global";
 type BoardFilter = GameId | "tournament" | null;
@@ -45,9 +47,10 @@ export class StatsScene extends Phaser.Scene {
   }
 
   create(): void {
+    centerOnDesignArea(this);
     const bg = this.add.graphics().setDepth(-10);
     bg.fillStyle(COLORS.night, 1);
-    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    bg.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
 
     this.add.text(LEFT, 36, "STATS", titleText(64, hex(COLORS.yellow)));
     createButton(this, RIGHT - 110, 74, "Menu", () => this.scene.start(SceneKeys.Menu), { variant: "ghost", width: 220, height: 64, fontSize: 28 });

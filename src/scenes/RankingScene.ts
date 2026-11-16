@@ -9,6 +9,8 @@ import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
 import { MatchConfig, newSeed, playerName } from "@/game/MatchConfig";
 import { Tournament } from "@/game/Tournament";
 import { drawBot, drawBotShadow } from "@/game/view/botArt";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
+import { centerOnDesignArea } from "@/ui/viewport";
 
 export interface RankingData {
   matchConfig: MatchConfig;
@@ -45,9 +47,10 @@ export class RankingScene extends Phaser.Scene {
   }
 
   create(): void {
+    centerOnDesignArea(this);
     const bg = this.add.graphics().setDepth(-10);
     bg.fillStyle(COLORS.night, 1);
-    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    bg.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
 
     const over = this.tournament.isOver;
     this.drawHeader(over);

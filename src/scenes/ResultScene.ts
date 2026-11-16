@@ -8,6 +8,8 @@ import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
 import { MatchConfig, newSeed } from "@/game/MatchConfig";
 import { drawBot, drawBotShadow, drawSmoke } from "@/game/view/botArt";
 import { fillSpark } from "@/game/view/draw";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
+import { centerOnDesignArea } from "@/ui/viewport";
 
 export interface BotEndState {
   team: TeamId;
@@ -39,12 +41,13 @@ export class ResultScene extends Phaser.Scene {
   }
 
   create(): void {
+    centerOnDesignArea(this);
     const { winner, score, botState } = this.resultData;
     const color = TEAM_COLORS[winner];
 
     const bg = this.add.graphics().setDepth(-10);
     bg.fillStyle(COLORS.night, 1);
-    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    bg.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
     bg.fillStyle(color, 0.12);
     bg.fillCircle(GAME_WIDTH / 2, 200, 420);
     const confetti = this.add.graphics().setDepth(-9);

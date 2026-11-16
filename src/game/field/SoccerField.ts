@@ -4,7 +4,8 @@ import { WALL_PHYSICS } from "@/config/physics";
 import { COLORS } from "@/config/theme";
 import { RoundedRect, halfHeightAt } from "@/game/field/fieldGeometry";
 import { CREAM, addAds, addSign, fillRounded, paintCrowd, paintRim, strokeRounded } from "@/game/field/stadium";
-import { bakeTexture } from "@/game/view/bake";
+import { addBackdrop } from "@/game/view/bake";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 
 export const FIELD_LEFT = 190;
 export const FIELD_RIGHT = GAME_WIDTH - 190;
@@ -187,8 +188,7 @@ export class SoccerField {
   // ───────────────────────────── rendering ─────────────────────────────
 
   private render(): void {
-    bakeTexture(this.scene, FIELD_TEXTURE_KEY, GAME_WIDTH, GAME_HEIGHT, (g) => this.paintStatic(g));
-    this.scene.add.image(0, 0, FIELD_TEXTURE_KEY).setOrigin(0, 0).setDepth(-20);
+    addBackdrop(this.scene, FIELD_TEXTURE_KEY, (g) => this.paintStatic(g));
     this.addAds();
     this.addCrowdSigns();
   }
@@ -196,7 +196,7 @@ export class SoccerField {
   private paintStatic(g: Phaser.GameObjects.Graphics): void {
     // Night backdrop.
     g.fillStyle(COLORS.night, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    g.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
 
     paintCrowd(g);
     paintRim(g);

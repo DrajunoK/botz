@@ -27,6 +27,7 @@ import { createPauseOverlay, createHandoffOverlay, playGoalFlash, playImpactBurs
 import { SFX } from "@/game/Audio";
 import type { ResultData } from "./ResultScene";
 import type { RankingData } from "./RankingScene";
+import { centerOnDesignArea } from "@/ui/viewport";
 
 interface ImpactRecord {
   a: MatterJS.BodyType;
@@ -105,6 +106,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    centerOnDesignArea(this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.redController?.destroy();
       this.yellowController?.destroy();

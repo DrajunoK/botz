@@ -7,6 +7,7 @@ import { BOT_ART_RADIUS, drawBot } from "@/game/view/botArt";
 import { BotParts } from "@/game/entities/BotParts";
 import { fillSpark } from "@/game/view/draw";
 import { Rng } from "@/game/Rng";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 
 /** Cosmetic randomness only (particle angles): gameplay never reads from this generator. */
 const fxRng = new Rng(0xb07a);
@@ -14,9 +15,9 @@ const fxRng = new Rng(0xb07a);
 function dimBackground(scene: Phaser.Scene, alpha = 0.72): Phaser.GameObjects.Graphics {
   const g = scene.add.graphics();
   g.fillStyle(0x070a16, alpha);
-  g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  g.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
   // Swallow taps so nothing under the overlay reacts.
-  g.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+  g.setInteractive(new Phaser.Geom.Rectangle(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
   return g;
 }
 
@@ -138,7 +139,7 @@ export function playGoalFlash(scene: Phaser.Scene, team: TeamId, x: number, y: n
 
   const flash = scene.add.graphics().setDepth(150);
   flash.fillStyle(0xffffff, 0.5);
-  flash.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+  flash.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
   scene.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() });
 
   const burst = scene.add.graphics().setDepth(151);

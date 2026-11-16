@@ -14,8 +14,9 @@ import { WALL_PHYSICS } from "@/config/physics";
 import { CREAM, addAds, addSign, fillRounded, paintCrowd, paintRim, strokeRounded } from "@/game/field/stadium";
 import { EndResult } from "@/game/petanque";
 import { Rng } from "@/game/Rng";
-import { bakeTexture } from "@/game/view/bake";
+import { addBackdrop } from "@/game/view/bake";
 import { titleText, bodyText } from "@/ui/ui";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 
 const TEXTURE_KEY = "botz-petanque-bg";
 const WALL_THICKNESS = 60;
@@ -28,8 +29,7 @@ export class PetanqueField {
   private readonly remaining: Phaser.GameObjects.Graphics;
 
   constructor(private readonly scene: Phaser.Scene) {
-    bakeTexture(scene, TEXTURE_KEY, GAME_WIDTH, GAME_HEIGHT, (g) => this.paintBackdrop(g));
-    scene.add.image(0, 0, TEXTURE_KEY).setOrigin(0, 0).setDepth(-20);
+    addBackdrop(scene, TEXTURE_KEY, (g) => this.paintBackdrop(g));
     this.remaining = scene.add.graphics().setDepth(-9);
     this.buildWalls();
     this.addDecor();
@@ -143,7 +143,7 @@ export class PetanqueField {
 
   private paintBackdrop(g: Phaser.GameObjects.Graphics): void {
     g.fillStyle(COLORS.night, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    g.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
     paintCrowd(g);
     paintRim(g);
 

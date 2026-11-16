@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { GAME_HEIGHT, GAME_WIDTH } from "@/config/game";
+import { WORLD_LEFT } from "@/config/viewport";
 import { COLORS, FONTS } from "@/config/theme";
 import { RoundedRect, wallInfo } from "@/game/field/fieldGeometry";
 import { CROWD_TILE, CROWD_TILE_H, CROWD_TILE_W, paintSpectator } from "@/game/view/crowd";
@@ -8,8 +9,8 @@ import { CROWD_TILE, CROWD_TILE_H, CROWD_TILE_W, paintSpectator } from "@/game/v
 
 /** Workshop-bench rim around the play area (holds the goal nets and the ads). */
 export const RIM_RECT: RoundedRect = { left: 86, right: GAME_WIDTH - 86, top: 76, bottom: GAME_HEIGHT - 76, radius: 250 };
-/** Outer edge of the stands. */
-export const CROWD_RECT: RoundedRect = { left: 6, right: GAME_WIDTH - 6, top: 6, bottom: GAME_HEIGHT - 6, radius: 300 };
+/** Outer edge of the stands: spans the whole visible world, margins of wide screens included. */
+export const CROWD_RECT: RoundedRect = { left: WORLD_LEFT + 6, right: GAME_WIDTH - WORLD_LEFT - 6, top: 6, bottom: GAME_HEIGHT - 6, radius: 300 };
 
 export const CREAM = 0xfff7ea;
 const CROWD_SCALE = 1.45;
@@ -32,7 +33,7 @@ export function paintCrowd(g: Phaser.GameObjects.Graphics): void {
   const s = CROWD_SCALE;
   const r = 9 * s;
   for (let ty = -CROWD_TILE_H * s; ty < GAME_HEIGHT + CROWD_TILE_H * s; ty += CROWD_TILE_H * s) {
-    for (let tx = -CROWD_TILE_W * s; tx < GAME_WIDTH + CROWD_TILE_W * s; tx += CROWD_TILE_W * s) {
+    for (let tx = WORLD_LEFT - CROWD_TILE_W * s; tx < GAME_WIDTH - WORLD_LEFT + CROWD_TILE_W * s; tx += CROWD_TILE_W * s) {
       for (const [px, py, color] of CROWD_TILE) {
         const x = tx + px * s;
         const y = ty + py * s;

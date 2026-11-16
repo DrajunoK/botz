@@ -14,8 +14,10 @@ import { BotParts } from "@/game/entities/BotParts";
 import { drawAntenna, drawBot, drawBotShadow } from "@/game/view/botArt";
 import { drawAlarmClock, drawClockShadow } from "@/game/view/alarmClockArt";
 import { CROWD_TILE, CROWD_TILE_H, CROWD_TILE_W, paintSpectator } from "@/game/view/crowd";
-import { bakeTexture } from "@/game/view/bake";
+import { addBackdrop } from "@/game/view/bake";
 import { fillSpark, roundLine } from "@/game/view/draw";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
+import { centerOnDesignArea } from "@/ui/viewport";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard"];
 const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: "Facile", normal: "Normal", hard: "Difficile" };
@@ -43,11 +45,11 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    centerOnDesignArea(this);
     this.settingsPanel = undefined;
     this.freePlayPanel = undefined;
     this.tournamentPanel = undefined;
-    bakeTexture(this, MENU_TEXTURE_KEY, GAME_WIDTH, GAME_HEIGHT, (g) => this.paintBackground(g));
-    this.add.image(0, 0, MENU_TEXTURE_KEY).setOrigin(0, 0).setDepth(-20);
+    addBackdrop(this, MENU_TEXTURE_KEY, (g) => this.paintBackground(g));
 
     this.addCharacters();
     this.addTitle();
@@ -72,7 +74,7 @@ export class MenuScene extends Phaser.Scene {
 
   private paintBackground(g: Phaser.GameObjects.Graphics): void {
     g.fillStyle(COLORS.night, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    g.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
 
     // Stars.
     g.fillStyle(0x3a4770, 1);
@@ -303,8 +305,8 @@ export class MenuScene extends Phaser.Scene {
 
     const dim = this.add.graphics();
     dim.fillStyle(0x070a16, 0.72);
-    dim.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    dim.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+    dim.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
+    dim.setInteractive(new Phaser.Geom.Rectangle(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
 
     const count = Math.min(TOURNAMENT_SIZE, PLAYABLE_GAMES.length);
     const elements: Phaser.GameObjects.GameObject[] = [dim, card(this, cx, cy, panelW, panelH)];
@@ -347,8 +349,8 @@ export class MenuScene extends Phaser.Scene {
 
     const dim = this.add.graphics();
     dim.fillStyle(0x070a16, 0.72);
-    dim.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    dim.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+    dim.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
+    dim.setInteractive(new Phaser.Geom.Rectangle(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
 
     const elements: Phaser.GameObjects.GameObject[] = [dim, card(this, cx, cy, panelW, panelH)];
     elements.push(this.add.text(cx, cy - panelH / 2 + 60, "JEU SIMPLE", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));
@@ -405,8 +407,8 @@ export class MenuScene extends Phaser.Scene {
 
     const dim = this.add.graphics();
     dim.fillStyle(0x070a16, 0.72);
-    dim.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    dim.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+    dim.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
+    dim.setInteractive(new Phaser.Geom.Rectangle(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
 
     const elements: Phaser.GameObjects.GameObject[] = [dim, card(this, cx, cy, panelW, panelH)];
     elements.push(this.add.text(cx, cy - panelH / 2 + 60, "RÉGLAGES", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));

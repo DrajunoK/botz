@@ -1,6 +1,8 @@
 import Phaser from "phaser";
 import "./styles.css";
-import { GAME_WIDTH, GAME_HEIGHT } from "@/config/game";
+import { GAME_HEIGHT } from "@/config/game";
+import { gameWidthForAspect } from "@/config/viewport";
+import { fitGameWidthToScreen } from "@/ui/viewport";
 import { GRAVITY } from "@/config/physics";
 import { BootScene } from "@/scenes/BootScene";
 import { MenuScene } from "@/scenes/MenuScene";
@@ -16,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_WIDTH,
+    width: gameWidthForAspect(window.innerWidth / window.innerHeight),
     height: GAME_HEIGHT,
   },
   physics: {
@@ -34,11 +36,11 @@ const config: Phaser.Types.Core.GameConfig = {
 
 const game = new Phaser.Game(config);
 
-// iOS reports a stale viewport size right after a rotation (and in standalone mode),
-// which leaves the canvas stuck at the previous orientation's size: re-measure a few times.
+// Browsers report a stale viewport size right after a rotation (and in standalone mode), which leaves
+// the canvas at the previous orientation's size: re-measure a few times.
 const refreshScale = (): void => {
-  game.scale.refresh();
-  for (const ms of [100, 300, 600]) window.setTimeout(() => game.scale.refresh(), ms);
+  fitGameWidthToScreen(game);
+  for (const ms of [100, 300, 600]) window.setTimeout(() => fitGameWidthToScreen(game), ms);
 };
 window.addEventListener("orientationchange", refreshScale);
 window.addEventListener("resize", refreshScale);

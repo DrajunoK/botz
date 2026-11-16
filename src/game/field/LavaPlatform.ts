@@ -5,7 +5,8 @@ import { PLATFORM_CENTER, PLATFORM_RADIUS, SHRINK_ANIM_MS } from "@/config/survi
 import { RoundedRect } from "@/game/field/fieldGeometry";
 import { Disc } from "@/game/field/survivorGeometry";
 import { CREAM, addAds, addSign, fillRounded, paintCrowd, paintRim, strokeRounded } from "@/game/field/stadium";
-import { bakeTexture } from "@/game/view/bake";
+import { addBackdrop } from "@/game/view/bake";
+import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 
 /** The lake of lava the catwalk floats on. */
 const LAVA_RECT: RoundedRect = { left: 120, right: GAME_WIDTH - 120, top: 100, bottom: GAME_HEIGHT - 100, radius: 330 };
@@ -24,8 +25,7 @@ export class LavaPlatform {
   private shrinkTween?: Phaser.Tweens.Tween;
 
   constructor(private readonly scene: Phaser.Scene) {
-    bakeTexture(scene, LAVA_TEXTURE_KEY, GAME_WIDTH, GAME_HEIGHT, (g) => this.paintBackdrop(g));
-    scene.add.image(0, 0, LAVA_TEXTURE_KEY).setOrigin(0, 0).setDepth(-20);
+    addBackdrop(scene, LAVA_TEXTURE_KEY, (g) => this.paintBackdrop(g));
     this.addDecor();
     this.addBubbles();
     this.g = scene.add.graphics().setDepth(-10);
@@ -63,7 +63,7 @@ export class LavaPlatform {
 
   private paintBackdrop(g: Phaser.GameObjects.Graphics): void {
     g.fillStyle(COLORS.night, 1);
-    g.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    g.fillRect(WORLD_LEFT, 0, WORLD_WIDTH, GAME_HEIGHT);
     paintCrowd(g);
     paintRim(g);
 
