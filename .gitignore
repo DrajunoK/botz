@@ -4,21 +4,6 @@ dist/
 .DS_Store
 *.log
 
-# Android
-android/.gradle/
-android/local.properties
-android/app/build/
-android/build/
-android/captures/
-android/.idea/
-
-# iOS
-ios/App/Pods/
-ios/App/output/
-ios/App/build/
-ios/App/DerivedData/
-ios/App/xcuserdata/
-
 # Private working files (not published)
 specs/
 .idea/
