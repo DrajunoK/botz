@@ -15,7 +15,8 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt", // the player chooses when to reload (see src/ui/updatePrompt.ts)
+      injectRegister: false,
       manifest: false, // public/manifest.webmanifest is the source of truth
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,woff2,webmanifest}"],
