@@ -32,4 +32,14 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, MenuScene, GameScene, ResultScene, RankingScene, StatsScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// iOS reports a stale viewport size right after a rotation (and in standalone mode),
+// which leaves the canvas stuck at the previous orientation's size: re-measure a few times.
+const refreshScale = (): void => {
+  game.scale.refresh();
+  for (const ms of [100, 300, 600]) window.setTimeout(() => game.scale.refresh(), ms);
+};
+window.addEventListener("orientationchange", refreshScale);
+window.addEventListener("resize", refreshScale);
+window.visualViewport?.addEventListener("resize", refreshScale);

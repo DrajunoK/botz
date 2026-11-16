@@ -12,6 +12,10 @@
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Botz" />
     <style>
       html,
       body {
@@ -24,9 +28,33 @@
         overscroll-behavior: none;
         touch-action: none;
       }
+      /* fixed + inset follows the real visible viewport (iOS URL bar, rotation) */
       #app {
-        width: 100%;
-        height: 100%;
+        position: fixed;
+        inset: 0;
+      }
+      #rotate {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 12px;
+        background: #141b31;
+        color: #fff;
+        font: 600 20px/1.3 system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      #rotate span {
+        font-size: 56px;
+      }
+      @media (orientation: portrait) {
+        #rotate {
+          display: flex;
+        }
       }
       canvas {
         display: block;
@@ -35,6 +63,7 @@
   </head>
   <body>
     <div id="app"></div>
+    <div id="rotate"><span>⟳</span>Tourne ton téléphone en mode paysage</div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -3,7 +3,7 @@
   "short_name": "Botz",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "any",
+  "orientation": "landscape",
   "background_color": "#141b31",
   "theme_color": "#141b31",
   "icons": [
