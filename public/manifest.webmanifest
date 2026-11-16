@@ -3,6 +3,7 @@
   "short_name": "Botz",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "landscape",
   "background_color": "#141b31",
   "theme_color": "#141b31",
