@@ -5,13 +5,17 @@
  */
 type LockableOrientation = ScreenOrientation & { lock(orientation: string): Promise<void> };
 
-export function fullscreenAvailable(): boolean {
-  const installed = window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches;
-  return document.fullscreenEnabled && !installed;
-}
-
 export function isFullscreen(): boolean {
   return document.fullscreenElement !== null;
+}
+
+export function fullscreenAvailable(): boolean {
+  if (!document.fullscreenEnabled) return false;
+  // While we are fullscreen ourselves, `display-mode: fullscreen` matches too: it would look
+  // like an installed PWA and hide the button needed to leave. Only a manifest-driven display
+  // mode leaves `fullscreenElement` null.
+  if (isFullscreen()) return true;
+  return !window.matchMedia("(display-mode: standalone), (display-mode: fullscreen)").matches;
 }
 
 /** Must be called from a user gesture (a tap). Best effort: the game works the same without it. */
