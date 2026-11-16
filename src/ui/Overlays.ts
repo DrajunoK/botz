@@ -8,6 +8,7 @@ import { BotParts } from "@/game/entities/BotParts";
 import { fillSpark } from "@/game/view/draw";
 import { Rng } from "@/game/Rng";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
+import { createFullscreenButton } from "@/ui/FullscreenButton";
 
 /** Cosmetic randomness only (particle angles): gameplay never reads from this generator. */
 const fxRng = new Rng(0xb07a);
@@ -53,6 +54,8 @@ export function createPauseOverlay(
   elements.push(createButton(scene, cx, cy - 50, "Reprendre", handlers.onResume, { variant: "primary" }));
   elements.push(createButton(scene, cx, cy + 60, "Recommencer", handlers.onRestart, { variant: "ghost" }));
   elements.push(createButton(scene, cx, cy + 170, "Quitter", handlers.onQuit, { variant: "danger" }));
+  const fullscreen = createFullscreenButton(scene, cx + 260 - 56, cy - 250 + 56, 72);
+  if (fullscreen) elements.push(fullscreen);
 
   return scene.add.container(0, 0, elements).setDepth(200);
 }

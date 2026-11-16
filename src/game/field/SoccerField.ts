@@ -297,8 +297,9 @@ export class SoccerField {
 
   /** Cream / yellow signs stuck on the stands, tilted like in the mockup. */
   private addCrowdSigns(): void {
-    addSign(this.scene, 520, 40, 180, 38, -3, CREAM, [{ text: "DRIIING !", color: "#d63a33", size: 20 }]);
-    addSign(this.scene, 1120, 40, 210, 38, 3, CREAM, [{ text: "RENDS TA ROUE", color: COLORS.ink, size: 18 }]);
+    // Bottom stands: the top ones are hidden behind the HUD, and the hint banner takes the bottom-left.
+    addSign(this.scene, 980, 862, 180, 38, -3, CREAM, [{ text: "DRIIING !", color: "#d63a33", size: 20 }]);
+    addSign(this.scene, 1230, 862, 210, 38, 3, CREAM, [{ text: "RENDS TA ROUE", color: COLORS.ink, size: 18 }]);
     addSign(this.scene, 48, 380, 86, 66, -7, CREAM, [
       { text: "GO", color: "#d63a33", size: 20 },
       { text: "ROUGE", color: "#d63a33", size: 16 },

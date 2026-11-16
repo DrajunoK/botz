@@ -10,6 +10,11 @@ const TOP_Y = 14;
 const ROW_H = 64;
 const CENTER_Y = TOP_Y + ROW_H / 2;
 
+/** The pause button is deliberately bigger than the HUD row: it is the only way out of a game, and small on a phone. */
+const PAUSE_SIZE = 84;
+const PAUSE_X = 16 + PAUSE_SIZE / 2;
+const LABEL_X = PAUSE_X + PAUSE_SIZE / 2 + 14;
+
 const PANIC_CELL_COLORS = [COLORS.panicCalm, COLORS.panicWarm, COLORS.panicHot, COLORS.red];
 
 /** In-game overlay, laid out like the "Partie" mockup: pause + turn, score + timer, alarm gauge, hint banner, GO. */
@@ -56,16 +61,16 @@ export class HUD {
     };
 
     // Pause (round) + turn pill.
-    this.pauseButton = createButton(scene, 52, CENTER_Y - 3, "", onPause, { width: 56, height: 56, variant: "ghost" });
+    this.pauseButton = createButton(scene, PAUSE_X, CENTER_Y - 3, "", onPause, { width: PAUSE_SIZE, height: PAUSE_SIZE, variant: "ghost" });
     const pauseIcon = scene.add.graphics();
     pauseIcon.fillStyle(0xe9edf7, 1);
-    pauseIcon.fillRoundedRect(-11, -13, 8, 26, 3);
-    pauseIcon.fillRoundedRect(3, -13, 8, 26, 3);
+    pauseIcon.fillRoundedRect(-17, -20, 12, 40, 4);
+    pauseIcon.fillRoundedRect(5, -20, 12, 40, 4);
     (this.pauseButton.list[1] as Phaser.GameObjects.Container).add(pauseIcon);
     track(this.pauseButton);
 
     this.gameLabelBg = track(scene.add.graphics());
-    this.gameLabel = track(scene.add.text(96 + 22, CENTER_Y, "", bodyText(22, COLORS.textSoft))).setOrigin(0, 0.5);
+    this.gameLabel = track(scene.add.text(LABEL_X + 22, CENTER_Y, "", bodyText(22, COLORS.textSoft))).setOrigin(0, 0.5);
     this.setGameLabel("Foot");
 
     // Score pill.
@@ -210,7 +215,7 @@ export class HUD {
   setGameLabel(label: string): void {
     this.gameLabel.setText(label);
     this.gameLabelBg.clear();
-    drawPill(this.gameLabelBg, 96, CENTER_Y - 22, this.gameLabel.width + 44, 44, 18);
+    drawPill(this.gameLabelBg, LABEL_X, CENTER_Y - 22, this.gameLabel.width + 44, 44, 18);
   }
 
   setAimTimer(remainingMs: number, durationMs: number): void {

@@ -2,7 +2,6 @@ import Phaser from "phaser";
 import "./styles.css";
 import { GAME_HEIGHT } from "@/config/game";
 import { gameWidthForAspect } from "@/config/viewport";
-import { enterFullscreenOnFirstTap } from "@/ui/fullscreen";
 import { fitGameWidthToScreen } from "@/ui/viewport";
 import { GRAVITY } from "@/config/physics";
 import { BootScene } from "@/scenes/BootScene";
@@ -46,4 +45,3 @@ const refreshScale = (): void => {
 window.addEventListener("orientationchange", refreshScale);
 window.addEventListener("resize", refreshScale);
 window.visualViewport?.addEventListener("resize", refreshScale);
-enterFullscreenOnFirstTap();

@@ -18,6 +18,7 @@ import { addBackdrop } from "@/game/view/bake";
 import { fillSpark, roundLine } from "@/game/view/draw";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 import { centerOnDesignArea } from "@/ui/viewport";
+import { createFullscreenButton } from "@/ui/FullscreenButton";
 
 const DIFFICULTIES: Difficulty[] = ["easy", "normal", "hard"];
 const DIFFICULTY_LABEL: Record<Difficulty, string> = { easy: "Facile", normal: "Normal", hard: "Difficile" };
@@ -51,6 +52,7 @@ export class MenuScene extends Phaser.Scene {
     this.tournamentPanel = undefined;
     addBackdrop(this, MENU_TEXTURE_KEY, (g) => this.paintBackground(g));
 
+    createFullscreenButton(this, GAME_WIDTH - 64, 64, 72);
     this.addCharacters();
     this.addTitle();
     this.addButtons();
