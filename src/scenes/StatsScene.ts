@@ -6,7 +6,7 @@ import { SceneKeys } from "./keys";
 import { createButton } from "@/ui/Button";
 import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
 import { Stats, Tally, summarize } from "@/state/stats";
-import { BoardRow, FriendStats, Profile, addFriend, fetchFriends, fetchLeaderboard, fetchProfile, setNickname, syncStats } from "@/net/cloud";
+import { BoardRow, FriendStats, Profile, addFriend, fetchFriends, fetchLeaderboard, fetchProfile, getAccount, setNickname, signInWithGoogle, signOut, syncStats } from "@/net/cloud";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 import { centerOnDesignArea } from "@/ui/viewport";
 
@@ -35,6 +35,8 @@ export class StatsScene extends Phaser.Scene {
   /** Bumped on every redraw so a slow network answer never paints over a newer screen. */
   private token = 0;
   private profile: Profile | null = null;
+  /** Top-right account button: "Se connecter avec Google", or the signed-in e-mail. */
+  private accountSlot!: Phaser.GameObjects.Container;
 
   constructor() {
     super(SceneKeys.Stats);
@@ -55,6 +57,9 @@ export class StatsScene extends Phaser.Scene {
     this.add.text(LEFT, 36, "STATS", titleText(64, hex(COLORS.yellow)));
     createButton(this, RIGHT - 110, 74, "Menu", () => this.scene.start(SceneKeys.Menu), { variant: "ghost", width: 220, height: 64, fontSize: 28 });
 
+    this.accountSlot = this.add.container(0, 0);
+    void this.renderAccount();
+
     this.view = this.add.container(0, 0);
     this.render();
     void syncStats(); // make sure the cloud has everything before friends / global are read
@@ -67,6 +72,32 @@ export class StatsScene extends Phaser.Scene {
     if (this.tab === "me") this.renderMe();
     else if (this.tab === "friends") void this.renderFriends(token);
     else void this.renderGlobal(token);
+  }
+
+  private async renderAccount(): Promise<void> {
+    const account = await getAccount();
+    if (!this.sys.isActive()) return;
+    this.accountSlot.removeAll(true);
+
+    const x = RIGHT - 220 - 24 - 220;
+    const button = account.linked
+      ? createButton(this, x, 74, account.email ?? "Compte Google", () => this.askSignOut(), { variant: "ghost", width: 440, height: 64, fontSize: 24 })
+      : createButton(this, x, 74, "Se connecter avec Google", () => this.startGoogleSignIn(), { variant: "primary", width: 440, height: 64, fontSize: 26 });
+    this.accountSlot.add(button);
+  }
+
+  private startGoogleSignIn(): void {
+    void signInWithGoogle().then((error) => {
+      if (error) window.alert(error);
+    });
+  }
+
+  private askSignOut(): void {
+    if (!window.confirm("Se déconnecter de ce compte Google ?\nTes stats restent liées au compte : reconnecte-toi pour les retrouver.")) return;
+    void signOut().then(() => {
+      void this.renderAccount();
+      this.render();
+    });
   }
 
   private fresh(token: number): boolean {

@@ -89,6 +89,14 @@ The landing page (`public/about.html`), the privacy policy (`public/privacy.html
 node scripts/generate-assets.mjs
 ```
 
+## Google sign-in (Supabase)
+
+Players start with an anonymous Supabase account; "Se connecter avec Google" (Stats screen) ties it to a Google account so stats and friends survive clearing the site data. One-time setup in the Botz Supabase project:
+
+1. Authentication → Sign In / Providers → **Google**: enable it with the OAuth client id and secret (the Google Cloud client used by Popote works; add `https://<botz-project-ref>.supabase.co/auth/v1/callback` to its authorized redirect URIs).
+2. Same page: turn on **Allow manual linking** (needed to attach Google to an anonymous account).
+3. Authentication → URL Configuration: Site URL `https://botz.pomponlabs.com`, and Redirect URLs `https://botz.pomponlabs.com/**` plus `http://localhost:5173/**` for development.
+
 ## Deployment
 
 Every push to `main` builds and deploys `dist/` to GitHub Pages (`.github/workflows/deploy.yml`). Static pages (`about.html`, `privacy.html`), the `CNAME` and the PWA manifest live in `public/`. In the repo settings, Pages → Source must be set to **GitHub Actions**.

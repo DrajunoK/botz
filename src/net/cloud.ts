@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/config/supabase";
 import { GameId } from "@/config/tournament";
+import { authReturnProblem } from "@/net/authReturn";
 import { Stats } from "@/state/stats";
 
 /**
@@ -34,7 +35,7 @@ let client: SupabaseClient | null = null;
 
 function supabase(): SupabaseClient {
   client ??= createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce" },
   });
   return client;
 }
@@ -51,6 +52,91 @@ async function ensureUser(): Promise<string | null> {
   } catch (err) {
     warn("anonymous sign-in", err);
     return null;
+  }
+}
+
+// ───────────────────────────── Google account ─────────────────────────────
+
+/** `linked` is true once the phone's anonymous profile has been tied to a Google account. */
+export interface Account {
+  linked: boolean;
+  email: string | null;
+}
+
+/** Local read, no network: a phone that never synced simply has no session yet. */
+export async function getAccount(): Promise<Account> {
+  try {
+    const { data } = await supabase().auth.getSession();
+    const user = data.session?.user;
+    return { linked: !!user && !user.is_anonymous, email: user?.email ?? null };
+  } catch (err) {
+    warn("account", err);
+    return { linked: false, email: null };
+  }
+}
+
+const redirectTo = (): string => `${window.location.origin}/`;
+
+/**
+ * Ties the anonymous profile to a Google account, keeping its stats and friends. Leaves the page
+ * for Google on success, so it only resolves with a message for the player when that fails.
+ */
+export async function signInWithGoogle(): Promise<string | null> {
+  try {
+    const sb = supabase();
+    const { data } = await sb.auth.getSession();
+    const options = { redirectTo: redirectTo() };
+    const anonymous = data.session?.user.is_anonymous ?? false;
+    const { error } = anonymous
+      ? await sb.auth.linkIdentity({ provider: "google", options })
+      : await sb.auth.signInWithOAuth({ provider: "google", options });
+    if (error) warn("google sign-in", error);
+    return error ? "Connexion Google impossible" : null;
+  } catch (err) {
+    warn("google sign-in", err);
+    return "Pas de connexion";
+  }
+}
+
+export async function signOut(): Promise<void> {
+  try {
+    await supabase().auth.signOut();
+  } catch (err) {
+    warn("sign out", err);
+  }
+}
+
+/** Guards the "switch to the existing profile" retry below against looping forever. */
+const SWITCHING_KEY = "botz.google-switch";
+
+function switching(value?: boolean): boolean {
+  try {
+    if (value === true) sessionStorage.setItem(SWITCHING_KEY, "1");
+    if (value === false) sessionStorage.removeItem(SWITCHING_KEY);
+    return sessionStorage.getItem(SWITCHING_KEY) !== null;
+  } catch {
+    return false; // storage blocked: behave as if no retry is in progress
+  }
+}
+
+/**
+ * Call once at boot. Finishes an OAuth round trip (the client exchanges the code in the URL) and
+ * tidies the address bar. If that Google account already owns another Botz profile, the anonymous
+ * profile of this phone cannot be merged into it, so we sign in to the existing profile instead.
+ */
+export async function completeSignIn(): Promise<void> {
+  const problem = authReturnProblem(window.location.search, window.location.hash);
+  try {
+    await supabase().auth.getSession(); // resolves once the code in the URL has been exchanged
+  } catch (err) {
+    warn("complete sign-in", err);
+  }
+  if (window.location.search || window.location.hash) window.history.replaceState(null, "", window.location.pathname);
+
+  if (problem === null) switching(false);
+  else if (problem === "identity_already_exists" && !switching()) {
+    switching(true);
+    await supabase().auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo() } });
   }
 }
 
