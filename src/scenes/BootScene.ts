@@ -1,7 +1,9 @@
 import Phaser from "phaser";
 import { FONTS } from "@/config/theme";
 import { SceneKeys } from "./keys";
-import { ALL_GAMES } from "@/config/tournament";
+import { ALL_GAMES, PLAYABLE_GAMES } from "@/config/tournament";
+import { parseLocalRoom } from "@/net/localRoom";
+import { roomFromLink } from "@/net/protocol";
 import { Tournament } from "@/game/Tournament";
 import { parseSyncTest } from "@/game/syncTest";
 import type { MatchConfig } from "@/game/MatchConfig";
@@ -19,7 +21,7 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     void syncStats(); // upload games finished while offline
-    const start = () => this.startSyncTest() || (import.meta.env.DEV && this.startPreview()) || this.scene.start(SceneKeys.Menu);
+    const start = () => this.startSyncTest() || this.startLocalRoom() || this.startInvite() || (import.meta.env.DEV && this.startPreview()) || this.scene.start(SceneKeys.Menu);
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (!fonts) {
       start();
@@ -36,6 +38,24 @@ export class BootScene extends Phaser.Scene {
     const config = parseSyncTest(window.location.search);
     if (!config) return false;
     this.scene.start(SceneKeys.Game, config);
+    return true;
+  }
+
+  /** `?localroom=ABCD&role=host&game=soccer&auto=1`: an online match between two tabs of one browser (see net/localRoom.ts). */
+  private startLocalRoom(): boolean {
+    const link = parseLocalRoom(window.location.search);
+    if (!link) return false;
+    const game = PLAYABLE_GAMES.find((g) => g === link.game) ?? "soccer";
+    this.scene.start(SceneKeys.Lobby, { gameId: game, localRoom: link });
+    return true;
+  }
+
+  /** An invite link (`?room=AB3K`) goes straight to joining that room. */
+  private startInvite(): boolean {
+    const code = roomFromLink(window.location.search);
+    if (!code) return false;
+    window.history.replaceState(null, "", window.location.pathname); // a reload must not re-join an old room
+    this.scene.start(SceneKeys.Lobby, { gameId: PLAYABLE_GAMES[0], joinCode: code });
     return true;
   }
 

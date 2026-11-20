@@ -40,6 +40,11 @@ function supabase(): SupabaseClient {
   return client;
 }
 
+/** The shared client, for the realtime channel of an online match (see realtime.ts). */
+export function realtimeClient(): SupabaseClient {
+  return supabase();
+}
+
 /** Id of the signed-in user; the first call on a fresh install creates an anonymous account. */
 async function ensureUser(): Promise<string | null> {
   try {

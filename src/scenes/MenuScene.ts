@@ -380,8 +380,9 @@ export class MenuScene extends Phaser.Scene {
     });
 
     elements.push(this.add.text(cx, cy + 50, GAME_INFO[this.freePlayGame].goal, bodyText(26, COLORS.textSoft, "500")).setOrigin(0.5));
-    elements.push(createButton(this, cx - 200, cy + 130, "Solo", () => this.startFreePlay("solo", this.freePlayGame), { width: 340, height: 70, fontSize: 28, variant: "primary" }));
-    elements.push(createButton(this, cx + 200, cy + 130, "2 joueurs", () => this.startFreePlay("passPlay", this.freePlayGame), { width: 340, height: 70, fontSize: 28, variant: "danger" }));
+    elements.push(createButton(this, cx - 290, cy + 130, "Solo", () => this.startFreePlay("solo", this.freePlayGame), { width: 270, height: 70, fontSize: 28, variant: "primary" }));
+    elements.push(createButton(this, cx, cy + 130, "2 joueurs", () => this.startFreePlay("passPlay", this.freePlayGame), { width: 270, height: 70, fontSize: 28, variant: "danger" }));
+    elements.push(createButton(this, cx + 290, cy + 130, "En ligne", () => this.scene.start(SceneKeys.Lobby, { gameId: this.freePlayGame }), { width: 270, height: 70, fontSize: 28, variant: "ghost" }));
     elements.push(createButton(this, cx, cy + panelH / 2 - 44, "Fermer", () => this.toggleFreePlay(), { width: 200, height: 52, fontSize: 24, variant: "ghost" }));
 
     return this.add.container(0, 0, elements).setDepth(500);

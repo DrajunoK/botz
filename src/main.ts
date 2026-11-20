@@ -12,6 +12,7 @@ import { GameScene } from "@/scenes/GameScene";
 import { ResultScene } from "@/scenes/ResultScene";
 import { RankingScene } from "@/scenes/RankingScene";
 import { StatsScene } from "@/scenes/StatsScene";
+import { LobbyScene } from "@/scenes/LobbyScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -33,7 +34,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [BootScene, MenuScene, GameScene, ResultScene, RankingScene, StatsScene],
+  scene: [BootScene, MenuScene, GameScene, ResultScene, RankingScene, StatsScene, LobbyScene],
 };
 
 const game = new Phaser.Game(config);

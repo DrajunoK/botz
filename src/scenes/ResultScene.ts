@@ -10,6 +10,7 @@ import { drawBot, drawBotShadow, drawSmoke } from "@/game/view/botArt";
 import { fillSpark } from "@/game/view/draw";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 import { centerOnDesignArea } from "@/ui/viewport";
+import type { OnlineSession } from "@/net/OnlineSession";
 
 export interface BotEndState {
   team: TeamId;
@@ -78,10 +79,57 @@ export class ResultScene extends Phaser.Scene {
     this.drawSquad("red", botState, GAME_WIDTH / 2 - 300, 500);
     this.drawSquad("yellow", botState, GAME_WIDTH / 2 + 300, 500);
 
-    createButton(this, GAME_WIDTH / 2 - 230, 770, "Rejouer", () => {
-      this.scene.start(SceneKeys.Game, { ...this.resultData.matchConfig, seed: newSeed() });
-    }, { variant: "primary", width: 380 });
-    createButton(this, GAME_WIDTH / 2 + 230, 770, "Menu", () => this.scene.start(SceneKeys.Menu), { variant: "ghost", width: 380 });
+    const online = this.resultData.matchConfig.online;
+    if (online) this.addOnlineButtons(online);
+    else {
+      createButton(this, GAME_WIDTH / 2 - 230, 770, "Rejouer", () => {
+        this.scene.start(SceneKeys.Game, { ...this.resultData.matchConfig, seed: newSeed() });
+      }, { variant: "primary", width: 380 });
+      createButton(this, GAME_WIDTH / 2 + 230, 770, "Menu", () => this.scene.start(SceneKeys.Menu), { variant: "ghost", width: 380 });
+    }
+  }
+
+  /** A rematch needs both players: each asks, the match restarts when both did. */
+  private addOnlineButtons(online: OnlineSession): void {
+    const y = 770;
+    const note = this.add.text(GAME_WIDTH / 2, y - 70, "", bodyText(28, COLORS.textMuted, "600")).setOrigin(0.5);
+    let rematchButton: Phaser.GameObjects.Container | undefined;
+
+    const showGone = () => {
+      rematchButton?.destroy();
+      rematchButton = undefined;
+      note.setText("Ton adversaire est parti");
+    };
+    const askRematch = () => {
+      online.askRematch();
+      rematchButton?.destroy();
+      rematchButton = undefined;
+      note.setText("Revanche demandée… en attente de ton adversaire");
+    };
+
+    createButton(this, GAME_WIDTH / 2 + 230, y, "Menu", () => {
+      online.leave();
+      this.scene.start(SceneKeys.Menu);
+    }, { variant: "ghost", width: 380 });
+
+    if (online.isClosed) {
+      showGone();
+    } else {
+      rematchButton = createButton(this, GAME_WIDTH / 2 - 230, y, "Revanche", askRematch, { variant: "primary", width: 380 });
+      if (this.resultData.matchConfig.onlineAutoplay) this.time.delayedCall(1500, askRematch);
+    }
+
+    online.onRematch = ({ seed }) => this.scene.start(SceneKeys.Game, { ...this.resultData.matchConfig, seed });
+    online.onPeerAway = () => note.setText("Ton adversaire est déconnecté…");
+    online.onPeerBack = () => note.setText("");
+    online.onPeerLeft = showGone;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      // The session lives on if a rematch starts; the next scene sets its own callbacks.
+      online.onRematch = undefined;
+      online.onPeerAway = undefined;
+      online.onPeerBack = undefined;
+      online.onPeerLeft = undefined;
+    });
   }
 
   update(_time: number, delta: number): void {

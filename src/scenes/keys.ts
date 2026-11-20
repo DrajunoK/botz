@@ -5,4 +5,5 @@ export const SceneKeys = {
   Result: "ResultScene",
   Ranking: "RankingScene",
   Stats: "StatsScene",
+  Lobby: "LobbyScene",
 } as const;

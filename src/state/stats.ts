@@ -7,7 +7,7 @@ const STORAGE_KEY = "botz.stats.v1";
 const KEEP_SYNCED = 300;
 
 /** Mirrors the `mode` / `context` / `result` check constraints of supabase/schema.sql. */
-export type StatsMode = "vs_ai" | "local_2p";
+export type StatsMode = "vs_ai" | "local_2p" | "online";
 export type StatsContext = "single" | "tournament";
 export type Outcome = "win" | "loss" | "draw";
 
@@ -70,23 +70,23 @@ function add(tally: Tally, result: Outcome): void {
 }
 
 /** Match mode as stored for stats: a pass-and-play game has no "own" side worth ranking. */
-export const statsMode = (mode: "solo" | "passPlay"): StatsMode => (mode === "solo" ? "vs_ai" : "local_2p");
+export const statsMode = (mode: "solo" | "passPlay" | "online"): StatsMode => (mode === "solo" ? "vs_ai" : mode === "online" ? "online" : "local_2p");
 
-/** The player is always the red team (player 1). */
-export const outcomeFor = (winner: TeamId | null): Outcome => (winner === null ? "draw" : winner === "red" ? "win" : "loss");
+/** The player is the red team (player 1), except online where the guest plays yellow. */
+export const outcomeFor = (winner: TeamId | null, player: TeamId = "red"): Outcome => (winner === null ? "draw" : winner === player ? "win" : "loss");
 
-/** Wins / losses by game and by tournament, counting only games played against the computer. */
+/** Wins / losses by game and by tournament: games against the computer or online, not two players on one phone. */
 export function summarize(matches: readonly MatchRecord[], tournaments: readonly TournamentRecord[], games: readonly GameId[]): StatsSummary {
   const summary: StatsSummary = { games: {} as Record<GameId, GameTally>, tournaments: emptyTally() };
   for (const g of games) summary.games[g] = { single: emptyTally(), tournament: emptyTally(), total: emptyTally() };
   for (const m of matches) {
-    if (m.mode !== "vs_ai") continue;
+    if (m.mode === "local_2p") continue;
     const tally = summary.games[m.game];
     if (!tally) continue;
     add(tally[m.context], m.result);
     add(tally.total, m.result);
   }
-  for (const t of tournaments) if (t.mode === "vs_ai") add(summary.tournaments, t.result);
+  for (const t of tournaments) if (t.mode !== "local_2p") add(summary.tournaments, t.result);
   return summary;
 }
 
@@ -115,16 +115,19 @@ export class StatsStore {
     tournamentId?: string;
     winner: TeamId;
     score: Record<TeamId, number>;
+    /** The side this phone's player was on (default red). */
+    player?: TeamId;
   }): MatchRecord {
+    const player = game.player ?? "red";
     const record: MatchRecord = {
       id: newId(),
       game: game.game,
       mode: game.mode,
       context: game.tournamentId ? "tournament" : "single",
       tournamentId: game.tournamentId,
-      result: outcomeFor(game.winner),
-      scoreFor: game.score.red,
-      scoreAgainst: game.score.yellow,
+      result: outcomeFor(game.winner, player),
+      scoreFor: game.score[player],
+      scoreAgainst: game.score[player === "red" ? "yellow" : "red"],
       playedAt: new Date().toISOString(),
       synced: false,
     };

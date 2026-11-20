@@ -40,3 +40,6 @@ export const TEAM_LABEL: Record<TeamId, string> = {
 };
 
 export type Difficulty = "easy" | "normal" | "hard";
+
+/** Aiming phase duration in an online match: both players think at once, on separate screens. */
+export const ONLINE_AIM_DURATION_MS = 30_000;

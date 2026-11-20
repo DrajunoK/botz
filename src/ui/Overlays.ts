@@ -44,16 +44,17 @@ export function botMascot(scene: Phaser.Scene, x: number, y: number, color: numb
 
 export function createPauseOverlay(
   scene: Phaser.Scene,
-  handlers: { onResume: () => void; onRestart: () => void; onQuit: () => void },
+  handlers: { onResume: () => void; onRestart?: () => void; onQuit: () => void },
 ): Phaser.GameObjects.Container {
   const cx = GAME_WIDTH / 2;
   const cy = GAME_HEIGHT / 2;
   const elements: Phaser.GameObjects.GameObject[] = [dimBackground(scene), card(scene, cx, cy, 520, 500)];
 
   elements.push(scene.add.text(cx, cy - 175, "PAUSE", titleText(56, hex(COLORS.yellow))).setOrigin(0.5));
-  elements.push(createButton(scene, cx, cy - 50, "Reprendre", handlers.onResume, { variant: "primary" }));
-  elements.push(createButton(scene, cx, cy + 60, "Recommencer", handlers.onRestart, { variant: "ghost" }));
-  elements.push(createButton(scene, cx, cy + 170, "Quitter", handlers.onQuit, { variant: "danger" }));
+  const { onRestart } = handlers;
+  elements.push(createButton(scene, cx, cy - (onRestart ? 50 : 0), "Reprendre", handlers.onResume, { variant: "primary" }));
+  if (onRestart) elements.push(createButton(scene, cx, cy + 60, "Recommencer", onRestart, { variant: "ghost" }));
+  elements.push(createButton(scene, cx, cy + (onRestart ? 170 : 110), "Quitter", handlers.onQuit, { variant: "danger" }));
   const fullscreen = createFullscreenButton(scene, cx + 260 - 56, cy - 250 + 56, 72);
   if (fullscreen) elements.push(fullscreen);
 

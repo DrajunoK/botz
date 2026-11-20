@@ -65,6 +65,7 @@ describe("StatsStore", () => {
   it("maps modes and winners to what the database stores", () => {
     expect(statsMode("solo")).toBe("vs_ai");
     expect(statsMode("passPlay")).toBe("local_2p");
+    expect(statsMode("online")).toBe("online");
     expect([outcomeFor("red"), outcomeFor("yellow"), outcomeFor(null)]).toEqual(["win", "loss", "draw"]);
   });
 });
@@ -99,5 +100,22 @@ describe("ids", () => {
 
   it("gives every tournament its own id", () => {
     expect(new Tournament({ games: ["soccer"] }).id).not.toBe(new Tournament({ games: ["soccer"] }).id);
+  });
+});
+
+describe("online games", () => {
+  it("are scored from the side the player was on", () => {
+    const store = new StatsStore(memoryStorage());
+    const yellowWin = store.recordGame({ game: "soccer", mode: "online", winner: "yellow", score: { red: 1, yellow: 2 }, player: "yellow" });
+    expect([yellowWin.result, yellowWin.scoreFor, yellowWin.scoreAgainst]).toEqual(["win", 2, 1]);
+    const redLoss = store.recordGame({ game: "soccer", mode: "online", winner: "yellow", score: { red: 1, yellow: 2 } });
+    expect([redLoss.result, redLoss.scoreFor]).toEqual(["loss", 1]);
+    expect(outcomeFor("red", "yellow")).toBe("loss");
+  });
+  it("count in the summary, unlike two players on one phone", () => {
+    const store = new StatsStore(memoryStorage());
+    store.recordGame({ game: "soccer", mode: "online", winner: "red", score: { red: 2, yellow: 0 } });
+    store.recordGame({ game: "soccer", mode: "local_2p", winner: "red", score: { red: 2, yellow: 0 } });
+    expect(summarize(store.matches, store.tournaments, ["soccer"]).games.soccer.total.wins).toBe(1);
   });
 });

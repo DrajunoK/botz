@@ -95,6 +95,11 @@ export class TurnManager extends EventEmitter {
     this.pendingAims.delete(botUid);
   }
 
+  /** The shot currently set for a bot, if any (online play sends the local team's shots to the opponent). */
+  getAim(botUid: number): ShotVector | undefined {
+    return this.pendingAims.get(botUid);
+  }
+
   hasAim(botUid: number): boolean {
     return this.pendingAims.has(botUid);
   }
@@ -179,7 +184,9 @@ export class TurnManager extends EventEmitter {
     this.resolveElapsedMs = 0;
     this.stableTickCount = 0;
     this.goalScoredThisResolution = false;
-    const shots = Array.from(this.pendingAims.values());
+    // Same order on every device (the order the aims were set in differs online): shots draw from the
+    // seeded generator one after the other, so the order decides who gets which random number.
+    const shots = Array.from(this.pendingAims.values()).sort((a, b) => a.botUid - b.botUid);
     this.emit("resolve", shots);
   }
 }

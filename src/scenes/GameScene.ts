@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { AIM_DURATION_MS, TEAM_LABEL, TeamId } from "@/config/game";
+import { AIM_DURATION_MS, GAME_WIDTH, ONLINE_AIM_DURATION_MS, TEAM_LABEL, TeamId } from "@/config/game";
 import { ALARM } from "@/config/alarmClock";
 import { CLOCK_RADIUS, FIXED_TIMESTEP_MS, MAX_SHOT_SPEED, MAX_STEPS_PER_FRAME } from "@/config/physics";
 import { DEBRIS, REPAIR_ON_GOAL } from "@/config/parts";
@@ -12,9 +12,10 @@ import { PetanqueMode } from "@/game/modes/PetanqueMode";
 import { GAME_INFO, GameId } from "@/config/tournament";
 import { botKey } from "@/game/Tournament";
 import { Stats, statsMode } from "@/state/stats";
+import { Body } from "@/game/util/matter";
 import { syncStats } from "@/net/cloud";
 import { TurnManager, ShotVector } from "@/game/TurnManager";
-import { AIController, AIContext } from "@/game/AIController";
+import { AIController, AIContext, AIShot } from "@/game/AIController";
 import { AimController } from "@/game/AimController";
 import { DamageSystem } from "@/game/DamageSystem";
 import { PanicTracker, panicConfig } from "@/game/Panic";
@@ -23,12 +24,15 @@ import { Bot } from "@/game/entities/Bot";
 import { AlarmClock } from "@/game/entities/AlarmClock";
 import { DebrisField } from "@/game/entities/Debris";
 import { HUD } from "@/ui/HUD";
+import { COLORS } from "@/config/theme";
+import { bodyText, hex } from "@/ui/ui";
 import { createPauseOverlay, createHandoffOverlay, playGoalFlash, playImpactBurst, playPartLostBurst } from "@/ui/Overlays";
 import { SFX } from "@/game/Audio";
 import type { ResultData } from "./ResultScene";
 import type { RankingData } from "./RankingScene";
 import { centerOnDesignArea } from "@/ui/viewport";
 import { hashNumbers } from "@/game/syncTest";
+import type { OnlineSession, PeerLeftReason } from "@/net/OnlineSession";
 
 interface ImpactRecord {
   a: MatterJS.BodyType;
@@ -49,6 +53,11 @@ function createMode(game: GameId): GameMode {
       throw new Error(`Game "${game}" is not implemented yet`);
   }
 }
+
+/** Our shots are locked and the opponent has said nothing for this long: they are gone. */
+const ONLINE_PEER_SILENCE_MS = 40_000;
+
+const WORLD_VALUES_PER_BODY = 9;
 
 const WALL_LABEL = "wall";
 const CLOCK_LABEL = "alarm";
@@ -89,6 +98,20 @@ export class GameScene extends Phaser.Scene {
   private syncLines: string[] = [];
   private syncReport?: Phaser.GameObjects.Text;
 
+  // Online match (see net/OnlineSession.ts). Both devices simulate the same match; only shots travel.
+  private online?: OnlineSession;
+  private localTeam: TeamId = "red";
+  private onlineAimMs = ONLINE_AIM_DURATION_MS;
+  private onlineLocked = false;
+  private onlinePeerShotsApplied = false;
+  private onlineWaitedMs = 0;
+  /** Guest: our world at the end of the last turn, waiting to be compared with the host's. */
+  private onlineMine?: { turn: number; values: number[]; epoch: number; checked: boolean };
+  /** Bumped whenever the world is moved on purpose (resolution starts, kickoff reset): a snapshot only applies within one epoch. */
+  private worldEpoch = 0;
+  private onlineEnded = false;
+  private onlineToast?: Phaser.GameObjects.Text;
+
   constructor() {
     super(SceneKeys.Game);
   }
@@ -107,6 +130,15 @@ export class GameScene extends Phaser.Scene {
     this.impacts = [];
     this.syncLines = [];
     this.syncReport = undefined;
+    this.online = data.online;
+    this.localTeam = data.online?.team ?? "red";
+    this.onlineLocked = false;
+    this.onlinePeerShotsApplied = false;
+    this.onlineWaitedMs = 0;
+    this.onlineMine = undefined;
+    this.worldEpoch = 0;
+    this.onlineEnded = false;
+    this.onlineToast = undefined;
     this.redBots = [];
     this.yellowBots = [];
   }
@@ -143,7 +175,11 @@ export class GameScene extends Phaser.Scene {
       this.clock = new AlarmClock(this, clockPos.x, clockPos.y);
     }
 
-    this.turnManager = new TurnManager({ goalsToWin: this.mode.goalsToWin, minResolveMs: this.mode.clock ? ALARM.runDurationMs : 0 });
+    this.turnManager = new TurnManager({
+      goalsToWin: this.mode.goalsToWin,
+      minResolveMs: this.mode.clock ? ALARM.runDurationMs : 0,
+      aimDurationMs: this.online ? ONLINE_AIM_DURATION_MS : undefined,
+    });
     this.turnManager.on("resolve", (shots: ShotVector[]) => this.handleResolve(shots));
     this.turnManager.on("goal", (team: TeamId) => this.handleGoal(team));
     this.turnManager.on("settled", () => this.handleSettled());
@@ -162,14 +198,18 @@ export class GameScene extends Phaser.Scene {
     this.hud.setGameLabel(this.gameLabel());
     this.refreshStanding();
 
-    this.redController = new AimController(this, this.turnManager, this.redBots);
-    this.redController.canAim = (b) => this.isAimable(b);
-    this.redController.onAimChange = () => this.refreshBanner();
-    if (this.matchConfig.mode === "passPlay") {
-      this.yellowController = new AimController(this, this.turnManager, this.yellowBots);
-      this.yellowController.canAim = (b) => this.isAimable(b);
-      this.yellowController.onAimChange = () => this.refreshBanner();
+    const makeController = (bots: Bot[]): AimController => {
+      const controller = new AimController(this, this.turnManager, bots);
+      controller.canAim = (b) => this.isAimable(b);
+      controller.onAimChange = () => this.refreshBanner();
+      return controller;
+    };
+    // Online, this device only ever aims its own team.
+    if (!this.online || this.localTeam === "red") this.redController = makeController(this.redBots);
+    if (this.matchConfig.mode === "passPlay" || (this.online && this.localTeam === "yellow")) {
+      this.yellowController = makeController(this.yellowBots);
     }
+    if (this.online) this.watchOpponent(this.online);
 
     this.matter.world.on("collisionstart", (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) this.recordImpact(pair);
@@ -263,6 +303,8 @@ export class GameScene extends Phaser.Scene {
     if (this.matchConfig.syncTest) {
       this.submitAIShots("red");
       this.submitAIShots("yellow");
+    } else if (this.online) {
+      this.beginOnlineAim();
     } else if (this.matchConfig.mode === "solo") {
       this.submitAIShots("yellow");
     } else {
@@ -295,7 +337,9 @@ export class GameScene extends Phaser.Scene {
       this.yellowController?.setEnabled(false);
       return;
     }
-    if (this.matchConfig.mode === "solo") {
+    if (this.online) {
+      this.localController()?.setEnabled(!this.onlineLocked && !this.isPaused);
+    } else if (this.matchConfig.mode === "solo") {
       this.redController?.setEnabled(true);
     } else if (this.passPlayStage === "red") {
       this.redController?.setEnabled(true);
@@ -312,6 +356,10 @@ export class GameScene extends Phaser.Scene {
       this.hud.setBanner(null, "", "");
       return;
     }
+    if (this.online) {
+      this.refreshOnlineBanner();
+      return;
+    }
     const team: TeamId = this.matchConfig.mode === "solo" ? "red" : this.passPlayStage;
     const bots = (team === "red" ? this.redBots : this.yellowBots).filter((b) => this.isAimable(b));
     const ready = bots.filter((b) => b.hasAim).length;
@@ -321,11 +369,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private submitAIShots(team: TeamId): void {
+    for (const s of this.computeAIShots(team)) this.turnManager.setAim(s.botUid, s.vx, s.vy);
+    this.turnManager.setTeamReady(team);
+  }
+
+  private computeAIShots(team: TeamId): AIShot[] {
     const own = team === "red" ? this.redBots : this.yellowBots;
     const other = team === "red" ? this.yellowBots : this.redBots;
+    const toState = (b: Bot) => ({ uid: b.uid, index: b.index, x: b.position.x, y: b.position.y });
     if (this.mode.aiShots) {
-      const toState = (b: Bot) => ({ uid: b.uid, index: b.index, x: b.position.x, y: b.position.y });
-      const shots = this.mode.aiShots({
+      return this.mode.aiShots({
         team,
         bots: own.filter((b) => this.isAimable(b)).map(toState),
         ownBots: own.filter((b) => !b.eliminated).map(toState),
@@ -333,17 +386,10 @@ export class GameScene extends Phaser.Scene {
         difficulty: this.matchConfig.difficulty,
         rng: () => this.rngAI.next(),
       });
-      for (const s of shots) this.turnManager.setAim(s.botUid, s.vx, s.vy);
-      this.turnManager.setTeamReady(team);
-      return;
     }
     const clockRules = this.mode.clock;
-    if (!clockRules || !this.clock) {
-      // The AI is written per mode; modes without a clock bring their own (not wired yet).
-      this.turnManager.setTeamReady(team);
-      return;
-    }
-    const toState = (b: Bot) => ({ uid: b.uid, index: b.index, x: b.position.x, y: b.position.y });
+    // The AI is written per mode; a mode with neither a clock nor its own AI gets no shots.
+    if (!clockRules || !this.clock) return [];
     const ctx: AIContext = {
       team,
       bots: own.map(toState),
@@ -356,13 +402,14 @@ export class GameScene extends Phaser.Scene {
       panicLevel: this.panic.level,
       rng: () => this.rngAI.next(),
     };
-    for (const s of AIController.computeShots(ctx)) this.turnManager.setAim(s.botUid, s.vx, s.vy);
-    this.turnManager.setTeamReady(team);
+    return AIController.computeShots(ctx);
   }
 
   private handleGoPressed(): void {
     if (this.turnManager.phase !== "AIMING") return;
-    if (this.matchConfig.mode === "solo") {
+    if (this.online) {
+      this.lockOnline();
+    } else if (this.matchConfig.mode === "solo") {
       this.turnManager.setTeamReady("red");
     } else {
       this.advancePassPlayStage();
@@ -389,6 +436,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private handleResolve(shots: ShotVector[]): void {
+    this.worldEpoch += 1;
     for (const shot of shots) {
       const bot = this.findBot(shot.botUid);
       const scale = this.mode.shotSpeedScale ?? 1;
@@ -469,6 +517,7 @@ export class GameScene extends Phaser.Scene {
 
   private handleGoal(team: TeamId): void {
     if (this.recordSyncTurn(`but ${team}`)) return;
+    this.shareTurnEnd();
     this.hud.setScore(this.turnManager.score);
     this.panic.onGoal();
     SFX.playGoal();
@@ -511,6 +560,7 @@ export class GameScene extends Phaser.Scene {
       this.turnManager.pause();
       return;
     }
+    this.shareTurnEnd();
     const pause = this.mode.onSettled?.(this.modeContext()) ?? null;
     this.syncScore();
     if (this.checkModeWinner(pause?.pauseMs ?? 1100)) return;
@@ -531,6 +581,7 @@ export class GameScene extends Phaser.Scene {
     }
     const score = { ...this.turnManager.score };
     const { tournament, gameId } = this.matchConfig;
+    this.online?.endMatch();
     this.recordStats(winner, score);
     if (tournament) {
       const partsAfter = Object.fromEntries(this.allBots().map((b) => [botKey(b.team, b.index), b.parts.remaining]));
@@ -551,7 +602,7 @@ export class GameScene extends Phaser.Scene {
   /** Stores the finished game (and the tournament, once its last game ends), then uploads in the background. */
   private recordStats(winner: TeamId, score: Record<TeamId, number>): void {
     const { tournament, gameId, mode } = this.matchConfig;
-    Stats.recordGame({ game: gameId, mode: statsMode(mode), tournamentId: tournament?.id, winner, score });
+    Stats.recordGame({ game: gameId, mode: statsMode(mode), tournamentId: tournament?.id, winner, score, player: this.online?.team });
     if (tournament && tournament.gameIndex + 1 >= tournament.games.length) {
       // The ranking screen records the final game on the tournament itself, so decide the winner here.
       const trophies = { ...tournament.trophies };
@@ -563,6 +614,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private resetKickoff(): void {
+    this.worldEpoch += 1;
     const redPos = this.mode.botSpawns("red");
     const yellowPos = this.mode.botSpawns("yellow");
     this.redBots.forEach((b, i) => b.placeAt(redPos[i].x, redPos[i].y));
@@ -574,16 +626,221 @@ export class GameScene extends Phaser.Scene {
     if (DEBRIS.clearOnGoal) this.debris.clear();
   }
 
+  // ───────────────────────────── online match ─────────────────────────────
+
+  /** The controller of the team this device plays (online only). */
+  private localController(): AimController | undefined {
+    return this.localTeam === "red" ? this.redController : this.yellowController;
+  }
+
+  private localBots(): Bot[] {
+    return this.localTeam === "red" ? this.redBots : this.yellowBots;
+  }
+
+  private beginOnlineAim(): void {
+    this.onlineLocked = false;
+    this.onlinePeerShotsApplied = false;
+    this.onlineWaitedMs = 0;
+    this.onlineAimMs = ONLINE_AIM_DURATION_MS;
+    this.localController()?.setEnabled(true);
+    this.localController()?.setVisible(true);
+    this.hud.setAimTimer(this.onlineAimMs, ONLINE_AIM_DURATION_MS);
+    if (this.matchConfig.onlineAutoplay) {
+      for (const s of this.computeAIShots(this.localTeam)) this.turnManager.setAim(s.botUid, s.vx, s.vy);
+      // A beat of "thinking", like a person: locking in the same instant would race the end-of-turn sync.
+      this.time.delayedCall(400, () => this.lockOnline());
+    }
+  }
+
+  /** Our shots are final: send them, and wait for the opponent's if they are not here yet. */
+  private lockOnline(): void {
+    if (!this.online || this.onlineLocked || this.turnManager.phase !== "AIMING") return;
+    this.onlineLocked = true;
+    const shots = this.localBots().flatMap((b) => {
+      const aim = this.turnManager.getAim(b.uid);
+      return aim ? [{ index: b.index, vx: aim.vx, vy: aim.vy }] : [];
+    });
+    this.online.sendAims(this.turnManager.turnNumber, shots);
+    this.localController()?.setEnabled(false);
+    this.hud.setGoVisible(false);
+    this.hud.setTimerVisible(false);
+    this.refreshBanner();
+    // Starts the resolution right away when the opponent's shots are already in.
+    this.turnManager.setTeamReady(this.localTeam);
+  }
+
+  /** The opponent's locked-in shots for this turn, once they have arrived. */
+  private applyPeerShots(): void {
+    if (!this.online || this.onlinePeerShotsApplied || this.turnManager.phase !== "AIMING") return;
+    const shots = this.online.peerAims(this.turnManager.turnNumber);
+    if (!shots) return;
+    this.onlinePeerShotsApplied = true;
+    const theirs = this.localTeam === "red" ? this.yellowBots : this.redBots;
+    for (const shot of shots) {
+      const bot = theirs.find((b) => b.index === shot.index);
+      if (bot && !bot.eliminated) this.turnManager.setAim(bot.uid, shot.vx, shot.vy);
+    }
+    this.refreshBanner();
+    this.turnManager.setTeamReady(this.online.opponentTeam);
+  }
+
+  /** Every frame of an online aim phase: our own clock, the opponent's shots, and the "gone quiet" check. */
+  private onlineTick(dt: number): void {
+    this.checkSnapshot();
+    if (!this.online || this.turnManager.phase !== "AIMING") return;
+    this.applyPeerShots();
+    if (this.turnManager.phase !== "AIMING") return;
+
+    if (!this.onlineLocked) {
+      this.onlineAimMs = Math.max(0, this.onlineAimMs - dt);
+      this.hud.setAimTimer(this.onlineAimMs, ONLINE_AIM_DURATION_MS);
+      if (this.onlineAimMs <= 0) this.lockOnline();
+    } else if (!this.onlinePeerShotsApplied) {
+      this.onlineWaitedMs += dt;
+      if (this.onlineWaitedMs > ONLINE_PEER_SILENCE_MS) this.opponentGone("silence");
+    }
+  }
+
+  private refreshOnlineBanner(): void {
+    const peerReady = this.onlinePeerShotsApplied;
+    if (this.onlineLocked) {
+      this.hud.setBanner(this.localTeam, "Tir validé", "· en attente de l'adversaire…");
+      return;
+    }
+    const bots = this.localBots().filter((b) => this.isAimable(b));
+    const ready = bots.filter((b) => b.hasAim).length;
+    const goal = this.mode.hud.standings ? "pousse les botz adverses dans la lave" : "glisse depuis un botz pour viser";
+    this.hud.setBanner(this.localTeam, "À toi", `· ${goal} · ${ready}/${bots.length} prêts${peerReady ? " · l'adversaire est prêt" : ""}`);
+  }
+
+  /**
+   * End of a turn: the host publishes its world, the guest keeps its own to compare. Floating point
+   * could in theory differ between two browsers; if it ever does, the host's world wins.
+   */
+  private shareTurnEnd(): void {
+    const online = this.online;
+    if (!online) return;
+    const turn = this.turnManager.turnNumber;
+    if (this.matchConfig.onlineDrift && online.role === "guest" && turn === 2) this.injectDrift();
+    const values = this.worldValues();
+    if (online.role === "host") online.sendSnapshot(turn, values);
+    else this.onlineMine = { turn, values, epoch: this.worldEpoch, checked: false };
+  }
+
+  /** Guest, every frame: compare the host's end-of-turn world with ours and repair it if it differs. */
+  private checkSnapshot(): void {
+    const mine = this.onlineMine;
+    if (!this.online || !mine || mine.checked) return;
+    const theirs = this.online.hostSnapshot(mine.turn);
+    if (!theirs) return;
+    mine.checked = true;
+    const same = theirs.length === mine.values.length && theirs.every((v, i) => v === mine.values[i]);
+    if (same) {
+      console.debug(`[online] turn ${mine.turn} in sync`);
+      return;
+    }
+    // Nothing has moved since we took our own snapshot (we are aiming): safe to copy the host's world.
+    const repaired = mine.epoch === this.worldEpoch && this.applyWorldValues(theirs);
+    console.warn(`[online] simulations differ after turn ${mine.turn}${repaired ? ": repaired from the host" : ""}`);
+    this.showOnlineToast(repaired ? "Écrans resynchronisés" : "Les deux écrans ne montrent plus la même partie");
+    if (repaired) this.time.delayedCall(2000, () => this.showOnlineToast(null));
+  }
+
+  /** Test hook (`&drift=1`): moves one body by a hair so the repair path can be exercised. */
+  private injectDrift(): void {
+    const body = (this.matter.world.getAllBodies() as MatterJS.BodyType[]).find((b) => !b.isStatic);
+    if (body) Body.setPosition(body, { x: body.position.x + 0.37, y: body.position.y }, false);
+  }
+
+  private watchOpponent(session: OnlineSession): void {
+    session.onPeerLeft = (reason) => this.opponentGone(reason);
+    session.onPeerAway = () => this.showOnlineToast("Ton adversaire est déconnecté… on l'attend");
+    session.onPeerBack = () => this.showOnlineToast(null);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      session.onPeerLeft = undefined;
+      session.onPeerAway = undefined;
+      session.onPeerBack = undefined;
+    });
+  }
+
+  /** Leaving an online match that is still going counts as a loss, and tells the opponent right away. */
+  private forfeitOnlineMatch(): void {
+    const online = this.online;
+    if (!online) return;
+    if (this.turnManager.phase !== "GAME_OVER") {
+      Stats.recordGame({
+        game: this.matchConfig.gameId,
+        mode: "online",
+        winner: online.opponentTeam,
+        score: { ...this.turnManager.score },
+        player: online.team,
+      });
+      void syncStats();
+    }
+    online.leave();
+  }
+
+  /** Message about the connection, centered under the HUD (the HUD's own notice slot is taken by the alarm gauge). */
+  private showOnlineToast(text: string | null): void {
+    this.onlineToast?.destroy();
+    this.onlineToast = undefined;
+    if (text === null) return;
+    this.onlineToast = this.add
+      .text(GAME_WIDTH / 2, 170, text, { ...bodyText(30, hex(COLORS.panicHot), "700"), backgroundColor: hex(COLORS.panel), padding: { x: 24, y: 12 } })
+      .setOrigin(0.5)
+      .setDepth(150);
+  }
+
+  /** The opponent quit, lost their connection for good, or stopped answering: the match is ours. */
+  private opponentGone(reason: PeerLeftReason | "silence"): void {
+    if (this.onlineEnded || this.turnManager.phase === "GAME_OVER") return;
+    this.onlineEnded = true;
+    this.online?.close();
+    this.localController()?.setEnabled(false);
+    this.hud.setGoVisible(false);
+    this.hud.setBanner(null, "", "");
+    this.showOnlineToast(reason === "quit" ? "Ton adversaire a quitté la partie" : "Ton adversaire est déconnecté");
+    this.turnManager.endGame(this.localTeam, this.turnManager.score);
+    this.time.delayedCall(2200, () => this.finishGame(this.localTeam));
+  }
+
   // ───────────────────────── determinism check ─────────────────────────
 
-  /** Hash of every moving body, bit for bit: two devices agree on it only if their simulations agree. */
-  private worldHash(): string {
+  /** Everything that decides how the bodies move from here, in a fixed order: the same on two devices in sync. */
+  private worldValues(): number[] {
     const values: number[] = [];
     for (const body of this.matter.world.getAllBodies() as MatterJS.BodyType[]) {
       if (body.isStatic) continue;
-      values.push(body.position.x, body.position.y, body.angle, body.velocity.x, body.velocity.y);
+      values.push(
+        body.position.x, body.position.y, body.angle, body.velocity.x, body.velocity.y,
+        body.angularVelocity, body.positionPrev.x, body.positionPrev.y, body.anglePrev,
+      );
     }
-    return hashNumbers(values);
+    return values;
+  }
+
+  /** Copies a world taken by `worldValues()` onto our bodies. False (and nothing changed) if the bodies do not match. */
+  private applyWorldValues(values: number[]): boolean {
+    const bodies = (this.matter.world.getAllBodies() as MatterJS.BodyType[]).filter((b) => !b.isStatic);
+    if (values.length !== bodies.length * WORLD_VALUES_PER_BODY) return false;
+    bodies.forEach((body, i) => {
+      const v = values.slice(i * WORLD_VALUES_PER_BODY, (i + 1) * WORLD_VALUES_PER_BODY);
+      Body.setPosition(body, { x: v[0], y: v[1] }, false);
+      Body.setAngle(body, v[2], false);
+      // Set last and directly: the helpers above also touch the previous-step fields.
+      body.velocity.x = v[3];
+      body.velocity.y = v[4];
+      body.angularVelocity = v[5];
+      body.positionPrev.x = v[6];
+      body.positionPrev.y = v[7];
+      body.anglePrev = v[8];
+    });
+    return true;
+  }
+
+  /** Hash of the world, bit for bit: two devices agree on it only if their simulations agree. */
+  private worldHash(): string {
+    return hashNumbers(this.worldValues());
   }
 
   /** Logs this turn's end state. Returns true once the requested number of turns is done (report shown). */
@@ -620,15 +877,22 @@ export class GameScene extends Phaser.Scene {
   private openPause(): void {
     if (this.isPaused) return;
     this.isPaused = true;
+    this.localController()?.setEnabled(false);
     this.pauseOverlay = createPauseOverlay(this, {
       onResume: () => this.closePause(),
-      onRestart: () => {
-        this.pauseOverlay?.destroy();
-        this.pauseOverlay = undefined;
-        this.isPaused = false;
-        this.scene.restart({ ...this.matchConfig, seed: newSeed() });
+      // A restart needs both players: online matches only offer to leave.
+      onRestart: this.online
+        ? undefined
+        : () => {
+            this.pauseOverlay?.destroy();
+            this.pauseOverlay = undefined;
+            this.isPaused = false;
+            this.scene.restart({ ...this.matchConfig, seed: newSeed() });
+          },
+      onQuit: () => {
+        this.forfeitOnlineMatch();
+        this.scene.start(SceneKeys.Menu);
       },
-      onQuit: () => this.scene.start(SceneKeys.Menu),
     });
   }
 
@@ -645,7 +909,8 @@ export class GameScene extends Phaser.Scene {
     const dt = Math.min(delta, 100);
     this.syncVisuals(dt);
 
-    if (this.isPaused || this.handoffOverlay) return;
+    // Online, the opponent keeps playing: the pause menu does not stop our clock or simulation.
+    if ((this.isPaused && !this.online) || this.handoffOverlay) return;
 
     const isPassPlayRedStage =
       this.matchConfig.mode === "passPlay" && this.turnManager.phase === "AIMING" && this.passPlayStage === "red";
@@ -657,7 +922,9 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (this.turnManager.phase === "AIMING") {
+    if (this.online) {
+      this.onlineTick(dt);
+    } else if (this.turnManager.phase === "AIMING") {
       this.turnManager.update(dt, []);
       if (this.turnManager.phase === "AIMING") this.hud.setAimTimer(this.turnManager.aimTimeRemainingMs, AIM_DURATION_MS);
     }
@@ -666,6 +933,12 @@ export class GameScene extends Phaser.Scene {
     this.stepAccumulatorMs += dt;
     let steps = 0;
     while (this.stepAccumulatorMs >= FIXED_TIMESTEP_MS && steps < MAX_STEPS_PER_FRAME) {
+      // Online, the world only moves during a resolution. Anywhere else the number of steps would depend
+      // on how long each player took to aim, and the two devices would drift apart.
+      if (this.online && this.turnManager.phase !== "RESOLVING") {
+        this.stepAccumulatorMs = 0;
+        break;
+      }
       this.stepAccumulatorMs -= FIXED_TIMESTEP_MS;
       steps += 1;
       this.stepSimulation();
