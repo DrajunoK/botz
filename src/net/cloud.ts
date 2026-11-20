@@ -119,6 +119,17 @@ function switching(value?: boolean): boolean {
   }
 }
 
+/** Drops the OAuth return parameters from the address bar; any other parameter (`?synctest=…`) stays. */
+function tidyAddressBar(): void {
+  const { search, hash, pathname } = window.location;
+  const params = new URLSearchParams(search);
+  for (const key of ["code", "error", "error_code", "error_description"]) params.delete(key);
+  const rest = params.toString();
+  const isAuthHash = /(^#|&)(access_token|refresh_token|error|error_code|error_description)=/.test(hash);
+  if (rest === search.replace(/^\?/, "") && !isAuthHash) return;
+  window.history.replaceState(null, "", pathname + (rest ? `?${rest}` : ""));
+}
+
 /**
  * Call once at boot. Finishes an OAuth round trip (the client exchanges the code in the URL) and
  * tidies the address bar. If that Google account already owns another Botz profile, the anonymous
@@ -131,7 +142,7 @@ export async function completeSignIn(): Promise<void> {
   } catch (err) {
     warn("complete sign-in", err);
   }
-  if (window.location.search || window.location.hash) window.history.replaceState(null, "", window.location.pathname);
+  tidyAddressBar();
 
   if (problem === null) switching(false);
   else if (problem === "identity_already_exists" && !switching()) {

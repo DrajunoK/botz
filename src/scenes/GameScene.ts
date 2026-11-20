@@ -28,6 +28,7 @@ import { SFX } from "@/game/Audio";
 import type { ResultData } from "./ResultScene";
 import type { RankingData } from "./RankingScene";
 import { centerOnDesignArea } from "@/ui/viewport";
+import { hashNumbers } from "@/game/syncTest";
 
 interface ImpactRecord {
   a: MatterJS.BodyType;
@@ -84,6 +85,9 @@ export class GameScene extends Phaser.Scene {
   private ringTimerMs = 0;
   private firstAimPhase = true;
   private impacts: ImpactRecord[] = [];
+  /** Determinism check: one line per finished turn (see game/syncTest.ts). */
+  private syncLines: string[] = [];
+  private syncReport?: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.Game);
@@ -101,6 +105,8 @@ export class GameScene extends Phaser.Scene {
     this.ringTimerMs = 0;
     this.firstAimPhase = true;
     this.impacts = [];
+    this.syncLines = [];
+    this.syncReport = undefined;
     this.redBots = [];
     this.yellowBots = [];
   }
@@ -254,8 +260,11 @@ export class GameScene extends Phaser.Scene {
     this.hud.setGoVisible(true);
     this.hud.setTimerVisible(true);
 
-    if (this.matchConfig.mode === "solo") {
-      this.submitAIShots();
+    if (this.matchConfig.syncTest) {
+      this.submitAIShots("red");
+      this.submitAIShots("yellow");
+    } else if (this.matchConfig.mode === "solo") {
+      this.submitAIShots("yellow");
     } else {
       this.passPlayStage = "red";
       this.activatePassPlayStage("red");
@@ -311,42 +320,44 @@ export class GameScene extends Phaser.Scene {
     this.hud.setBanner(team, name, `· ${goal} · ${ready}/${bots.length} prêts`);
   }
 
-  private submitAIShots(): void {
+  private submitAIShots(team: TeamId): void {
+    const own = team === "red" ? this.redBots : this.yellowBots;
+    const other = team === "red" ? this.yellowBots : this.redBots;
     if (this.mode.aiShots) {
       const toState = (b: Bot) => ({ uid: b.uid, index: b.index, x: b.position.x, y: b.position.y });
       const shots = this.mode.aiShots({
-        team: "yellow",
-        bots: this.yellowBots.filter((b) => this.isAimable(b)).map(toState),
-        ownBots: this.yellowBots.filter((b) => !b.eliminated).map(toState),
-        opponentBots: this.redBots.filter((b) => !b.eliminated).map(toState),
+        team,
+        bots: own.filter((b) => this.isAimable(b)).map(toState),
+        ownBots: own.filter((b) => !b.eliminated).map(toState),
+        opponentBots: other.filter((b) => !b.eliminated).map(toState),
         difficulty: this.matchConfig.difficulty,
         rng: () => this.rngAI.next(),
       });
       for (const s of shots) this.turnManager.setAim(s.botUid, s.vx, s.vy);
-      this.turnManager.setTeamReady("yellow");
+      this.turnManager.setTeamReady(team);
       return;
     }
     const clockRules = this.mode.clock;
     if (!clockRules || !this.clock) {
       // The AI is written per mode; modes without a clock bring their own (not wired yet).
-      this.turnManager.setTeamReady("yellow");
+      this.turnManager.setTeamReady(team);
       return;
     }
     const toState = (b: Bot) => ({ uid: b.uid, index: b.index, x: b.position.x, y: b.position.y });
     const ctx: AIContext = {
-      team: "yellow",
-      bots: this.yellowBots.map(toState),
-      opponentBots: this.redBots.map(toState),
+      team,
+      bots: own.map(toState),
+      opponentBots: other.map(toState),
       clock: this.clock.position,
-      ownGoal: clockRules.goalCenterFor("yellow"),
-      opponentGoal: clockRules.goalCenterFor("red"),
+      ownGoal: clockRules.goalCenterFor(team),
+      opponentGoal: clockRules.goalCenterFor(team === "red" ? "yellow" : "red"),
       difficulty: this.matchConfig.difficulty,
       turnNumber: this.turnManager.turnNumber,
       panicLevel: this.panic.level,
       rng: () => this.rngAI.next(),
     };
     for (const s of AIController.computeShots(ctx)) this.turnManager.setAim(s.botUid, s.vx, s.vy);
-    this.turnManager.setTeamReady("yellow");
+    this.turnManager.setTeamReady(team);
   }
 
   private handleGoPressed(): void {
@@ -457,6 +468,7 @@ export class GameScene extends Phaser.Scene {
   // ───────────────────────────── goals ─────────────────────────────
 
   private handleGoal(team: TeamId): void {
+    if (this.recordSyncTurn(`but ${team}`)) return;
     this.hud.setScore(this.turnManager.score);
     this.panic.onGoal();
     SFX.playGoal();
@@ -495,6 +507,10 @@ export class GameScene extends Phaser.Scene {
 
   /** A resolution settled: let the mode score / sweep up, hold the game for its animation if it asks to. */
   private handleSettled(): void {
+    if (this.recordSyncTurn("fin de tour")) {
+      this.turnManager.pause();
+      return;
+    }
     const pause = this.mode.onSettled?.(this.modeContext()) ?? null;
     this.syncScore();
     if (this.checkModeWinner(pause?.pauseMs ?? 1100)) return;
@@ -509,6 +525,10 @@ export class GameScene extends Phaser.Scene {
 
   /** Hands over to the ranking (tournament) or the result screen (free play). */
   private finishGame(winner: TeamId): void {
+    if (this.matchConfig.syncTest) {
+      this.showSyncReport(`partie finie (${winner})`);
+      return;
+    }
     const score = { ...this.turnManager.score };
     const { tournament, gameId } = this.matchConfig;
     this.recordStats(winner, score);
@@ -552,6 +572,47 @@ export class GameScene extends Phaser.Scene {
 
     if (REPAIR_ON_GOAL) for (const b of this.allBots()) b.repair();
     if (DEBRIS.clearOnGoal) this.debris.clear();
+  }
+
+  // ───────────────────────── determinism check ─────────────────────────
+
+  /** Hash of every moving body, bit for bit: two devices agree on it only if their simulations agree. */
+  private worldHash(): string {
+    const values: number[] = [];
+    for (const body of this.matter.world.getAllBodies() as MatterJS.BodyType[]) {
+      if (body.isStatic) continue;
+      values.push(body.position.x, body.position.y, body.angle, body.velocity.x, body.velocity.y);
+    }
+    return hashNumbers(values);
+  }
+
+  /** Logs this turn's end state. Returns true once the requested number of turns is done (report shown). */
+  private recordSyncTurn(what: string): boolean {
+    const options = this.matchConfig.syncTest;
+    if (!options) return false;
+    this.syncLines.push(`tour ${this.syncLines.length + 1}  ${this.worldHash()}  ${what}`);
+    if (this.syncLines.length < options.turns) {
+      this.showSyncReport();
+      return false;
+    }
+    this.showSyncReport("terminé");
+    return true;
+  }
+
+  private showSyncReport(note = ""): void {
+    const lines = [
+      `SYNCTEST ${this.matchConfig.gameId}  graine ${this.matchConfig.seed}`,
+      ...this.syncLines,
+      note ? `${note.toUpperCase()}  ·  ${this.syncLines.length} tours` : "",
+    ];
+    const text = lines.filter(Boolean).join("\n");
+    if (!this.syncReport) {
+      this.syncReport = this.add
+        .text(30, 110, text, { fontFamily: "monospace", fontSize: "30px", color: "#ffffff", backgroundColor: "#000000cc", padding: { x: 14, y: 10 } })
+        .setDepth(1000);
+    } else {
+      this.syncReport.setText(text);
+    }
   }
 
   // ───────────────────────────── pause ─────────────────────────────

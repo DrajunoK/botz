@@ -1,6 +1,7 @@
 import { Difficulty, TeamId } from "@/config/game";
 import { GameId } from "@/config/tournament";
 import type { Tournament } from "@/game/Tournament";
+import type { SyncTestOptions } from "@/game/syncTest";
 
 export type MatchMode = "solo" | "passPlay";
 
@@ -15,6 +16,8 @@ export interface MatchConfig {
   gameId: GameId;
   /** Present when this game is part of a tournament; absent in free play. */
   tournament?: Tournament;
+  /** Hidden determinism check (see syncTest.ts): AI plays both teams and each turn is hashed. */
+  syncTest?: SyncTestOptions;
 }
 
 /** Fresh seed for a new match (wall-clock based: this is the one place entropy enters). */

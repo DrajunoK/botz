@@ -3,6 +3,7 @@ import { FONTS } from "@/config/theme";
 import { SceneKeys } from "./keys";
 import { ALL_GAMES } from "@/config/tournament";
 import { Tournament } from "@/game/Tournament";
+import { parseSyncTest } from "@/game/syncTest";
 import type { MatchConfig } from "@/game/MatchConfig";
 import type { RankingData } from "./RankingScene";
 import { syncStats } from "@/net/cloud";
@@ -18,7 +19,7 @@ export class BootScene extends Phaser.Scene {
 
   create(): void {
     void syncStats(); // upload games finished while offline
-    const start = () => (import.meta.env.DEV && this.startPreview()) || this.scene.start(SceneKeys.Menu);
+    const start = () => this.startSyncTest() || (import.meta.env.DEV && this.startPreview()) || this.scene.start(SceneKeys.Menu);
     const fonts = (document as Document & { fonts?: FontFaceSet }).fonts;
     if (!fonts) {
       start();
@@ -28,6 +29,14 @@ export class BootScene extends Phaser.Scene {
     // Never block the game on a slow font: fall through after 2.5 s.
     const timeout = new Promise<void>((resolve) => setTimeout(resolve, 2500));
     void Promise.race([loads, timeout]).then(start, start);
+  }
+
+  /** `?synctest=soccer&seed=42` opens the hidden determinism check (see game/syncTest.ts). */
+  private startSyncTest(): boolean {
+    const config = parseSyncTest(window.location.search);
+    if (!config) return false;
+    this.scene.start(SceneKeys.Game, config);
+    return true;
   }
 
   /** Dev only: `#ranking` or `#final` opens the tournament screens on a made-up 3-game tournament. */
