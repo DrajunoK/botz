@@ -208,8 +208,8 @@ export class StatsScene extends Phaser.Scene {
     this.text(LEFT + 40, 335, profile.friendCode, titleText(56, hex(COLORS.yellow)));
     this.text(760, 288, "TON PSEUDO", bodyText(22, COLORS.textFaint, "700")).setLetterSpacing(2);
     this.text(760, 335, profile.nickname, titleText(44));
-    this.view.add(createButton(this, 1330, 290, "Changer", () => this.askNickname(profile.nickname), { variant: "ghost", width: 200, height: 54, fontSize: 24 }));
-    this.view.add(createButton(this, 1330, 350, "Ajouter un ami", () => this.askFriend(), { variant: "primary", width: 330, height: 54, fontSize: 24 }));
+    this.view.add(createButton(this, 1112, 315, "Changer", () => this.askNickname(profile.nickname), { variant: "ghost", width: 180, height: 54, fontSize: 24 }));
+    this.view.add(createButton(this, 1360, 315, "Ajouter un ami", () => this.askFriend(), { variant: "primary", width: 270, height: 54, fontSize: 24 }));
 
     if (friends.length === 0) {
       this.note("Aucun ami pour l'instant.\nDonne ton code à un ami, ou entre le sien avec « Ajouter un ami ».", 600);
