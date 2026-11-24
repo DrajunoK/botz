@@ -5,7 +5,7 @@ export const POINTS_TO_WIN = 5;
 /** Same as Pétanque: the strongest throw has to reach the target from the throwing circle. */
 export const SHOT_SPEED_SCALE = 1.8;
 
-export const MEASURE_MS = 3200;
+export const MEASURE_MS = 2200;
 
 /** Playable ice (inside the boards). */
 export const ICE = { left: 190, right: 1410, top: 190, bottom: 710 } as const;

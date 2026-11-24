@@ -35,3 +35,37 @@ export function bowlingWinner(pins: { red: number; yellow: number }, framesPlaye
   if (framesPlayed < frames || pins.red === pins.yellow) return null;
   return pins.red > pins.yellow ? "red" : "yellow";
 }
+
+export interface Bumper {
+  x: number;
+  /** Offset from the lane's centre line (the same for both lanes). */
+  dy: number;
+}
+
+/** Picks the bumpers of a frame: spread along the lane, never both on the same line. `next` is the seeded generator. */
+export function pickBumpers(next: () => number, count: number, xMin: number, xMax: number, dyMin: number, dyMax: number, minGap: number): Bumper[] {
+  const out: Bumper[] = [];
+  for (let i = 0; i < count; i++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const b = { x: xMin + next() * (xMax - xMin), dy: (next() < 0.5 ? -1 : 1) * (dyMin + next() * (dyMax - dyMin)) };
+      if (out.every((o) => Math.hypot(o.x - b.x, o.dy - b.dy) >= minGap)) {
+        out.push(b);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/** Whether the straight path of a ball from `from` to `to` clears a round post. */
+export function pathClears(from: Spot, to: Spot, post: Spot, clearance: number): boolean {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = Math.max(0, Math.min(1, ((post.x - from.x) * dx + (post.y - from.y) * dy) / len2));
+  return Math.hypot(from.x + dx * t - post.x, from.y + dy * t - post.y) >= clearance;
+}
+
+/** Points for the pins that fell: one each, the golden one worth `goldValue`. */
+export const pinPoints = (fallen: readonly number[], goldIndex: number, goldValue: number): number =>
+  fallen.reduce((sum, i) => sum + (i === goldIndex ? goldValue : 1), 0);

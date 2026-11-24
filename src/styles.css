@@ -31,11 +31,15 @@
   background: #0e1428;
   color: #e9edf7;
   font: 600 16px/1.2 "Fredoka", system-ui, sans-serif;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .update-toast button {
-  min-height: 44px;
-  padding: 0 18px;
+  min-height: 48px;
+  padding: 0 20px;
+  cursor: pointer;
   border: 0;
   border-radius: 12px;
   background: #f6c234;
@@ -45,7 +49,7 @@
 }
 
 .update-toast button.ghost {
-  min-width: 44px;
+  min-width: 48px;
   padding: 0;
   background: transparent;
   color: #aeb8d0;

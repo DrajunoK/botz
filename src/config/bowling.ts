@@ -1,15 +1,14 @@
 /** Bowling: two lanes, one per team, each with its own ten pins. */
 
-export const FRAMES = 5;
-export const THROWS_PER_FRAME = 2;
-export const SHOT_SPEED_SCALE = 1.8;
+export const FRAMES = 6;
+export const SHOT_SPEED_SCALE = 2.1;
 /** Pause after a frame, to show what fell. */
-export const FRAME_PAUSE_MS = 2400;
+export const FRAME_PAUSE_MS = 1800;
 
 export const PIN_COUNT = 10;
 export const PIN_RADIUS = 16;
 export const PIN_SPACING = 42;
-export const PIN_PHYSICS = { restitution: 0.55, friction: 0.04, frictionAir: 0.055, density: 0.0016 };
+export const PIN_PHYSICS = { restitution: 0.4, friction: 0.05, frictionAir: 0.06, density: 0.0026 };
 /** A pin that ended further than this from its spot counts as knocked down. */
 export const KNOCKED_DISTANCE = 20;
 
@@ -32,3 +31,15 @@ export const START_X = 262;
 export const FOUL_LINE_X = 360;
 export const HEAD_PIN_X = 1130;
 export const WALL_RESTITUTION = 0.5;
+
+/** One pin per frame is golden (worth this many points); it is the same pin on both lanes. */
+export const GOLD_PIN_VALUE = 3;
+
+/** Bumpers: round posts that stand in the lane for one frame, at the same spots on both lanes. */
+export const BUMPER_RADIUS = 24;
+export const BUMPERS_PER_FRAME = 2;
+export const BUMPER_X_MIN = 520;
+export const BUMPER_X_MAX = 940;
+/** Distance from the lane's centre line, at least and at most. */
+export const BUMPER_OFFSET_MIN = 62;
+export const BUMPER_OFFSET_MAX = 104;

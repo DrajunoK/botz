@@ -27,3 +27,23 @@ describe("bowling", () => {
     expect(bowlingWinner({ red: 21, yellow: 20 }, 5, 5)).toBe("red");
   });
 });
+
+import { pathClears, pickBumpers, pinPoints } from "@/game/bowling";
+
+describe("bowling extras", () => {
+  it("weights the golden pin", () => {
+    expect(pinPoints([0, 3, 7], 3, 3)).toBe(5);
+    expect(pinPoints([0, 1], -1, 3)).toBe(2);
+  });
+  it("tells whether a post is in the way", () => {
+    expect(pathClears({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 10 }, 40)).toBe(false);
+    expect(pathClears({ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 50, y: 80 }, 40)).toBe(true);
+  });
+  it("spreads bumpers apart", () => {
+    let s = 7;
+    const next = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    const b = pickBumpers(next, 2, 500, 900, 30, 90, 120);
+    expect(b).toHaveLength(2);
+    expect(Math.hypot(b[0].x - b[1].x, b[0].dy - b[1].dy)).toBeGreaterThanOrEqual(120);
+  });
+});

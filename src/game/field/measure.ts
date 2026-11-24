@@ -7,7 +7,7 @@ import { bodyText, titleText } from "@/ui/ui";
  * "On mesure !": dashed lines from the jack to each team's closest bot, a "le plus près" badge on the
  * winner and a ring on every bot that scores, then the verdict. Returns a function that removes it all.
  */
-export function showMeasure(scene: Phaser.Scene, jack: { x: number; y: number }, result: EndResult): () => void {
+export function showMeasure(scene: Phaser.Scene, jack: { x: number; y: number }, result: EndResult, verdictMs = 1400): () => void {
   const objects: Phaser.GameObjects.GameObject[] = [];
   const g = scene.add.graphics().setDepth(100);
   objects.push(g);
@@ -46,7 +46,7 @@ export function showMeasure(scene: Phaser.Scene, jack: { x: number; y: number },
 
   const title = scene.add.text(GAME_WIDTH / 2, 150, "ON MESURE !", titleText(40, "#ffffff")).setOrigin(0.5).setDepth(101).setStroke("#141b31", 8);
   objects.push(title);
-  scene.time.delayedCall(1400, () => {
+  scene.time.delayedCall(verdictMs, () => {
     if (!title.active) return;
     if (result.winner) {
       const label = result.winner === "red" ? "ROUGE" : "JAUNE";

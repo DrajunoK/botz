@@ -32,13 +32,25 @@ function showToast(onReload: () => void): void {
 
   const reload = document.createElement("button");
   reload.textContent = "Recharger";
-  reload.addEventListener("click", onReload);
+  reload.addEventListener("click", () => {
+    reload.disabled = true;
+    reload.textContent = "…";
+    onReload();
+    // The service worker normally reloads the page once it takes over; if that never happens, do it by hand.
+    window.setTimeout(() => window.location.reload(), 3000);
+  });
 
   const dismiss = document.createElement("button");
   dismiss.className = "ghost";
   dismiss.setAttribute("aria-label", "Plus tard");
   dismiss.textContent = "✕";
   dismiss.addEventListener("click", () => toast.remove());
+
+  // The game listens to the whole window: without this, a tap on the toast also presses whatever
+  // game button sits under it, and the toast feels like it misses.
+  for (const type of ["pointerdown", "pointerup", "mousedown", "mouseup", "touchstart", "touchend"]) {
+    toast.addEventListener(type, (e) => e.stopPropagation());
+  }
 
   toast.append(message, reload, dismiss);
   document.body.append(toast);

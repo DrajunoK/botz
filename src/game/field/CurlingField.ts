@@ -60,7 +60,7 @@ export class CurlingField {
   }
 
   showMeasure(center: { x: number; y: number }, result: EndResult): () => void {
-    return showMeasure(this.scene, center, result);
+    return showMeasure(this.scene, center, result, 700);
   }
 
   private buildWalls(): void {

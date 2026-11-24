@@ -8,15 +8,34 @@ export const ARENA = { left: 130, right: 1470, top: 150, bottom: 850 } as const;
 export const MIRROR_X = (ARENA.left + ARENA.right) / 2;
 export const mirrorX = (x: number): number => 2 * MIRROR_X - x;
 
-/** Deposit zones against the short walls, where a bolt scores. */
-export const ZONE = {
-  red: { left: ARENA.left, right: ARENA.left + 200, top: 300, bottom: 700 },
-  yellow: { left: ARENA.right - 200, right: ARENA.right, top: 300, bottom: 700 },
+/** One pit per team, against its own short wall: a bolt that falls in scores for the team that owns it. */
+export const PIT = {
+  red: { x: ARENA.left + 130, y: 500, r: 100 },
+  yellow: { x: ARENA.right - 130, y: 500, r: 100 },
 } as const;
+/** How far inside the rim the centre of a body must be before it falls in. */
+export const BOLT_FALL_MARGIN = 0;
+export const BOT_FALL_MARGIN = 24;
+export const BOMB_FALL_MARGIN = 8;
+/** Bolts piled in a pit are drawn inside this radius. */
+export const PILE_RADIUS = 76;
+export const PILE_MAX = 26;
+
+/** The bomb: pushed into a pit it explodes, throwing the bolts of that pit back out and shoving what is near. */
+export const BOMB_RADIUS = 22;
+export const BOMB_PHYSICS = { restitution: 0.5, friction: 0.04, frictionAir: 0.05, density: 0.004 };
+export const BOMB_RETURN_TURNS = 2;
+export const BLAST_RADIUS = 260;
+export const BLAST_PUSH = 9;
+export const EJECT_SPEED_MIN = 6;
+export const EJECT_SPEED_MAX = 13;
+/** Where the golden bolt and the bomb appear (symmetric between the two teams). */
+export const GOLD_SPOT = { x: MIRROR_X, y: 330 } as const;
+export const BOMB_SPOT = { x: MIRROR_X, y: 670 } as const;
 
 export const BOLT_RADIUS = 15;
 export const GOLD_RADIUS = 20;
-export const BOLT_PHYSICS = { restitution: 0.5, friction: 0.04, frictionAir: 0.05, density: 0.003 };
+export const BOLT_PHYSICS = { restitution: 0.5, friction: 0.04, frictionAir: 0.035, density: 0.003 };
 /** Bolts and golden bolts that exist in total; the ones not on the floor wait to be dropped again. */
 export const BOLT_POOL = 24;
 export const GOLD_POOL = 2;

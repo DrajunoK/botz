@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GAME_HEIGHT, TEAM_COLORS, TeamId } from "@/config/game";
-import { ARENA, WALL_RESTITUTION, ZONE } from "@/config/boulons";
+import { ARENA, PIT, WALL_RESTITUTION } from "@/config/boulons";
 import { COLORS } from "@/config/theme";
 import { WALL_PHYSICS } from "@/config/physics";
 import { CREAM, addAds, addSign } from "@/game/field/stadium";
@@ -86,46 +86,36 @@ export class BoulonsField {
     g.strokeCircle((left + right) / 2, (top + bottom) / 2, 40);
 
     for (const team of ["red", "yellow"] as TeamId[]) {
-      const z = ZONE[team];
+      const { x, y, r } = PIT[team];
       const color = TEAM_COLORS[team];
-      g.fillStyle(color, 0.28);
-      g.fillRoundedRect(z.left, z.top, z.right - z.left, z.bottom - z.top, 26);
-      g.lineStyle(6, color, 1);
-      const w = z.right - z.left;
-      const h = z.bottom - z.top;
-      // Dashed outline (the side along the wall is left open).
-      const edge = (x0: number, y0: number, x1: number, y1: number) => {
-        const len = Math.hypot(x1 - x0, y1 - y0);
-        const ux = (x1 - x0) / len;
-        const uy = (y1 - y0) / len;
-        for (let d = 0; d < len; d += 30) {
-          const e = Math.min(d + 18, len);
-          g.lineBetween(x0 + ux * d, y0 + uy * d, x0 + ux * e, y0 + uy * e);
-        }
-      };
-      if (team === "red") {
-        edge(z.left, z.top, z.right, z.top);
-        edge(z.right, z.top, z.right, z.bottom);
-        edge(z.right, z.bottom, z.left, z.bottom);
-      } else {
-        edge(z.right, z.top, z.left, z.top);
-        edge(z.left, z.top, z.left, z.bottom);
-        edge(z.left, z.bottom, z.right, z.bottom);
-      }
-      // A funnel arrow pointing at the wall.
-      const dir = team === "red" ? -1 : 1;
-      const cx = z.left + w / 2;
-      const cy = z.top + h / 2;
-      g.fillStyle(color, 0.7);
-      g.fillTriangle(cx + dir * 36, cy, cx - dir * 24, cy - 40, cx - dir * 24, cy + 40);
+      // Steel lip, team-coloured ring, then the hole going down.
+      g.fillStyle(0x4a5370, 1);
+      g.fillCircle(x, y, r + 20);
+      g.fillStyle(color, 1);
+      g.fillCircle(x, y, r + 11);
+      g.fillStyle(0x2b2233, 1);
+      g.fillCircle(x, y, r + 3);
+      g.fillStyle(0x1b2036, 1);
+      g.fillCircle(x, y, r);
+      g.fillStyle(0x12172b, 1);
+      g.fillCircle(x + 3, y + 5, r * 0.86);
+      g.fillStyle(0x0b0f20, 1);
+      g.fillCircle(x + 6, y + 10, r * 0.66);
+      g.fillStyle(0x060812, 1);
+      g.fillCircle(x + 8, y + 14, r * 0.42);
+      // Light catching the upper lip.
+      g.lineStyle(5, 0xffffff, 0.22);
+      g.beginPath();
+      g.arc(x, y, r - 2, Math.PI * 1.05, Math.PI * 1.55);
+      g.strokePath();
     }
   }
 
   private addDecor(): void {
     for (const team of ["red", "yellow"] as TeamId[]) {
-      const z = ZONE[team];
+      const p = PIT[team];
       this.scene.add
-        .text((z.left + z.right) / 2, z.top - 28, "DÉPÔT", { fontFamily: "Bungee", fontSize: "26px", color: team === "red" ? "#a52e29" : "#8a6411" })
+        .text(p.x, p.y + p.r + 44, "FOSSE", { fontFamily: "Bungee", fontSize: "24px", color: team === "red" ? "#a52e29" : "#8a6411" })
         .setOrigin(0.5)
         .setDepth(-9);
     }

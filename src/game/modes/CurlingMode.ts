@@ -63,7 +63,7 @@ export class CurlingMode implements GameMode {
   }
 
   notice(): { text: string } {
-    return { text: `Manche ${this.end} · Pierre ${Math.min(this.throwIndex + 1, BOTZ_PER_TEAM)}/${BOTZ_PER_TEAM}` };
+    return { text: `Manche ${this.end} · Pierre ${Math.min(this.throwIndex + 1, BOTZ_PER_TEAM)}/${BOTZ_PER_TEAM} · premier à ${POINTS_TO_WIN}` };
   }
 
   /** After the last slide of the end, the house is measured and scored. */

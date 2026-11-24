@@ -72,39 +72,42 @@ export class PinRack {
   }
 
   /** Draws every pin in play: upright, or lying down once knocked off its spot. */
-  draw(g: Phaser.GameObjects.Graphics): void {
+  draw(g: Phaser.GameObjects.Graphics, goldIndex = -1): void {
     const order = this.active().sort((p, q) => p[1].position.y - q[1].position.y);
     for (const [i, b] of order) {
       const spot = this.spots[i];
       const dx = b.position.x - spot.x;
       const dy = b.position.y - spot.y;
       const moved = Math.hypot(dx, dy);
-      if (moved < 9) this.drawStanding(g, b.position.x, b.position.y);
-      else this.drawFallen(g, b.position.x, b.position.y, Math.atan2(dy, dx));
+      const gold = i === goldIndex;
+      if (moved < 9) this.drawStanding(g, b.position.x, b.position.y, gold);
+      else this.drawFallen(g, b.position.x, b.position.y, Math.atan2(dy, dx), gold);
     }
   }
 
   /** An upright pin seen from a little above: belly, neck with a red band, and a round head. */
-  private drawStanding(g: Phaser.GameObjects.Graphics, x: number, y: number): void {
+  private drawStanding(g: Phaser.GameObjects.Graphics, x: number, y: number, gold: boolean): void {
     const edge = 0x2b2233;
+    const body = gold ? 0xffd24a : 0xf8f4ea;
+    const band = gold ? 0x9a6a10 : 0xd63a33;
     g.fillStyle(0x000000, 0.28);
     g.fillEllipse(x + 4, y + 12, 32, 13);
     // belly
-    g.fillStyle(0xf8f4ea, 1);
+    g.fillStyle(body, 1);
     g.fillEllipse(x, y + 1, 30, 34);
     g.lineStyle(2.5, edge, 1);
     g.strokeEllipse(x, y + 1, 30, 34);
     // neck
-    g.fillStyle(0xf8f4ea, 1);
+    g.fillStyle(body, 1);
     g.fillEllipse(x, y - 14, 15, 18);
     g.lineStyle(2.5, edge, 1);
     g.strokeEllipse(x, y - 14, 15, 18);
     // red bands
-    g.fillStyle(0xd63a33, 1);
+    g.fillStyle(band, 1);
     g.fillEllipse(x, y - 13, 15, 6);
     g.fillEllipse(x, y - 5, 22, 6);
     // head
-    g.fillStyle(0xf8f4ea, 1);
+    g.fillStyle(body, 1);
     g.fillCircle(x, y - 25, 7.5);
     g.lineStyle(2.5, edge, 1);
     g.strokeCircle(x, y - 25, 7.5);
@@ -113,7 +116,7 @@ export class PinRack {
     g.fillEllipse(x - 6, y + 4, 4, 14);
   }
 
-  private drawFallen(g: Phaser.GameObjects.Graphics, x: number, y: number, angle: number): void {
+  private drawFallen(g: Phaser.GameObjects.Graphics, x: number, y: number, angle: number, gold: boolean): void {
     const half = PIN_RADIUS * 1.25;
     const w = PIN_RADIUS * 0.62;
     const cos = Math.cos(angle);
@@ -121,13 +124,13 @@ export class PinRack {
     const p = (u: number, v: number) => ({ x: x + u * cos - v * sin, y: y + u * sin + v * cos });
     g.fillStyle(0x000000, 0.25);
     g.fillEllipse(x + 3, y + 5, half * 2, w * 2.2);
-    g.fillStyle(0xe9e2d2, 1);
+    g.fillStyle((gold ? 0xf0c040 : 0xe9e2d2), 1);
     g.fillPoints([p(-half, -w), p(half, -w * 0.6), p(half, w * 0.6), p(-half, w)], true);
     g.fillCircle(p(-half, 0).x, p(-half, 0).y, w);
     g.fillCircle(p(half, 0).x, p(half, 0).y, w * 0.62);
     g.lineStyle(2, 0x2b2233, 1);
     g.strokePoints([p(-half, -w), p(half, -w * 0.6), p(half, w * 0.6), p(-half, w)], true);
-    g.fillStyle(0xd63a33, 1);
+    g.fillStyle(gold ? 0x9a6a10 : 0xd63a33, 1);
     g.fillPoints([p(half * 0.2, -w * 0.8), p(half * 0.5, -w * 0.72), p(half * 0.5, w * 0.72), p(half * 0.2, w * 0.8)], true);
   }
 }
