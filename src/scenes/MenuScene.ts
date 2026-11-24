@@ -219,7 +219,7 @@ export class MenuScene extends Phaser.Scene {
     shadow.setDepth(1);
     title.setDepth(2);
     this.add
-      .text(x, Y(126), "Foot, Survivant, Pétanque : des mini-jeux de petits robots qui perdent leurs pièces.", {
+      .text(x, Y(126), "Foot, Pétanque, Bowling, Curling… des mini-jeux de petits robots qui perdent leurs pièces.", {
         ...bodyText(Math.round(15 * S), COLORS.textSoft, "400"),
         wordWrap: { width: X(300) },
         lineSpacing: 6,
@@ -346,7 +346,7 @@ export class MenuScene extends Phaser.Scene {
 
   private buildFreePlayPanel(): Phaser.GameObjects.Container {
     const panelW = 900;
-    const panelH = 520;
+    const panelH = 660;
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 
@@ -359,31 +359,33 @@ export class MenuScene extends Phaser.Scene {
     elements.push(this.add.text(cx, cy - panelH / 2 + 60, "JEU SIMPLE", titleText(40, hex(COLORS.yellow))).setOrigin(0.5));
     elements.push(this.add.text(cx, cy - panelH / 2 + 112, "Choisis un jeu, sans tournoi", bodyText(24, COLORS.textMuted, "500")).setOrigin(0.5));
 
+    const perRow = 3;
     ALL_GAMES.forEach((game, i) => {
-      const x = cx + (i - (ALL_GAMES.length - 1) / 2) * 270;
+      const x = cx + ((i % perRow) - (perRow - 1) / 2) * 280;
+      const y = cy - 130 + Math.floor(i / perRow) * 86;
       const playable = PLAYABLE_GAMES.includes(game);
       const selected = playable && this.freePlayGame === game;
       const label = playable ? GAME_INFO[game].name : `${GAME_INFO[game].name} · bientôt`;
       const button = createButton(
         this,
         x,
-        cy - 40,
+        y,
         label,
         () => {
           if (!playable) return;
           this.freePlayGame = game;
           this.refreshFreePlayPanel();
         },
-        { width: 250, height: 70, fontSize: playable ? 28 : 21, variant: selected ? "primary" : "ghost" },
+        { width: 264, height: 70, fontSize: label.length > 12 ? 22 : 28, variant: selected ? "primary" : "ghost" },
       );
       if (!playable) button.setAlpha(0.45);
       elements.push(button);
     });
 
-    elements.push(this.add.text(cx, cy + 50, GAME_INFO[this.freePlayGame].goal, bodyText(26, COLORS.textSoft, "500")).setOrigin(0.5));
-    elements.push(createButton(this, cx - 290, cy + 130, "Solo", () => this.startFreePlay("solo", this.freePlayGame), { width: 270, height: 70, fontSize: 28, variant: "primary" }));
-    elements.push(createButton(this, cx, cy + 130, "2 joueurs", () => this.startFreePlay("passPlay", this.freePlayGame), { width: 270, height: 80, fontSize: 28, variant: "danger", subLabel: "(local)" }));
-    elements.push(createButton(this, cx + 290, cy + 130, "En ligne", () => this.scene.start(SceneKeys.Lobby, { gameId: this.freePlayGame }), { width: 270, height: 70, fontSize: 28, variant: "ghost" }));
+    elements.push(this.add.text(cx, cy + 60, GAME_INFO[this.freePlayGame].goal, bodyText(26, COLORS.textSoft, "500")).setOrigin(0.5));
+    elements.push(createButton(this, cx - 290, cy + 150, "Solo", () => this.startFreePlay("solo", this.freePlayGame), { width: 270, height: 70, fontSize: 28, variant: "primary" }));
+    elements.push(createButton(this, cx, cy + 150, "2 joueurs", () => this.startFreePlay("passPlay", this.freePlayGame), { width: 270, height: 80, fontSize: 28, variant: "danger", subLabel: "(local)" }));
+    elements.push(createButton(this, cx + 290, cy + 150, "En ligne", () => this.scene.start(SceneKeys.Lobby, { gameId: this.freePlayGame }), { width: 270, height: 70, fontSize: 28, variant: "ghost" }));
     elements.push(createButton(this, cx, cy + panelH / 2 - 44, "Fermer", () => this.toggleFreePlay(), { width: 200, height: 52, fontSize: 24, variant: "ghost" }));
 
     return this.add.container(0, 0, elements).setDepth(500);

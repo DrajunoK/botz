@@ -163,12 +163,12 @@ export class StatsScene extends Phaser.Scene {
   private renderMe(): void {
     const s = summarize(Stats.matches, Stats.tournaments, ALL_GAMES);
     const colX = [LEFT + 40, 700, 1000, 1300];
-    const headY = 262;
+    const headY = 254;
     for (const [i, label] of ["", "JEU SIMPLE", "EN TOURNOI", "TOTAL"].entries()) {
       if (label) this.text(colX[i], headY, label, bodyText(22, COLORS.textFaint, "700")).setLetterSpacing(2);
     }
 
-    const rowH = 100;
+    const rowH = 70;
     const rows: { name: string; cells: (Tally | null)[] }[] = ALL_GAMES.map((g) => ({
       name: GAME_INFO[g].name,
       cells: [s.games[g].single, s.games[g].tournament, s.games[g].total],
@@ -176,16 +176,16 @@ export class StatsScene extends Phaser.Scene {
     rows.push({ name: "Tournois", cells: [null, s.tournaments, null] });
 
     rows.forEach((row, i) => {
-      const y = 300 + i * (rowH + 12);
+      const y = 282 + i * (rowH + 8);
       this.panel(LEFT, y, RIGHT - LEFT, rowH);
-      this.text(colX[0], y + rowH / 2, row.name, titleText(36));
+      this.text(colX[0], y + rowH / 2, row.name, titleText(30));
       row.cells.forEach((cell, c) => {
         if (cell) this.tally(colX[c + 1], y + rowH / 2, cell);
         else this.text(colX[c + 1], y + rowH / 2, "–", bodyText(30, COLORS.textFaint, "500"));
       });
     });
 
-    this.text(LEFT, 826, "Parties contre l'ordinateur uniquement (V = victoire, D = défaite).", bodyText(24, COLORS.textFaint, "500"));
+    this.text(LEFT, 842, "Parties contre l'ordinateur uniquement (V = victoire, D = défaite).", bodyText(24, COLORS.textFaint, "500"));
   }
 
   // ───────────────────────────── tab: friends ─────────────────────────────
@@ -220,14 +220,14 @@ export class StatsScene extends Phaser.Scene {
 
   private friendRows(friends: FriendStats[]): void {
     this.text(LEFT + 40, 420, "AMIS", bodyText(22, COLORS.textFaint, "700")).setLetterSpacing(2);
-    this.text(RIGHT - 40, 420, "V · D PAR JEU (FOOT / SURVIVANT / PÉTANQUE)", bodyText(22, COLORS.textFaint, "700"), [1, 0.5]).setLetterSpacing(2);
+    this.text(RIGHT - 40, 420, "V · D PAR JEU", bodyText(22, COLORS.textFaint, "700"), [1, 0.5]).setLetterSpacing(2);
     friends.forEach((f, i) => {
       const y = 450 + i * 74;
       this.panel(LEFT, y, RIGHT - LEFT, 66, COLORS.night);
       this.text(LEFT + 40, y + 33, f.nickname, titleText(30));
       const cells = ALL_GAMES.map((g) => f.byGame[g]).map((r) => (r ? `${r.wins}–${r.losses}` : "–"));
-      this.text(RIGHT - 40, y + 33, cells.join("   ·   "), bodyText(28, COLORS.textMain, "700"), [1, 0.5]);
-      this.text(900, y + 33, `${f.wins} V · ${f.losses} D`, bodyText(28, COLORS.textSoft, "600"));
+      this.text(RIGHT - 40, y + 33, cells.join("  ·  "), bodyText(22, COLORS.textMain, "700"), [1, 0.5]);
+      this.text(700, y + 33, `${f.wins} V · ${f.losses} D`, bodyText(28, COLORS.textSoft, "600"));
     });
   }
 
@@ -275,7 +275,7 @@ export class StatsScene extends Phaser.Scene {
   private addFilters(): void {
     const filters: { id: BoardFilter; label: string }[] = [
       { id: null, label: "Tous" },
-      ...ALL_GAMES.map((g) => ({ id: g as BoardFilter, label: GAME_INFO[g].name })),
+      ...ALL_GAMES.map((g) => ({ id: g as BoardFilter, label: GAME_INFO[g].short })),
       { id: "tournament", label: "Tournois" },
     ];
     filters.forEach((f, i) => {
@@ -283,14 +283,14 @@ export class StatsScene extends Phaser.Scene {
       this.view.add(
         createButton(
           this,
-          LEFT + 110 + i * 230,
+          LEFT + 88 + i * 178,
           262,
           f.label,
           () => {
             this.boardFilter = f.id;
             this.render();
           },
-          { width: 210, height: 50, fontSize: 24, variant: active ? "primary" : "ghost" },
+          { width: 168, height: 50, fontSize: 20, variant: active ? "primary" : "ghost" },
         ),
       );
     });

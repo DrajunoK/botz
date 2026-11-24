@@ -61,7 +61,7 @@ grant update (nickname) on public.profiles to authenticated;
 create table public.matches (
   id uuid primary key,
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
-  game text not null check (game in ('soccer', 'survivor', 'petanque')),
+  game text not null check (game in ('soccer', 'survivor', 'petanque', 'curling', 'bowling', 'boulons')),
   mode text not null check (mode in ('vs_ai', 'local_2p', 'online')),
   context text not null check (context in ('single', 'tournament')),
   tournament_id uuid,

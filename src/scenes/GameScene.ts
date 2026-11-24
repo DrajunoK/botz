@@ -9,6 +9,9 @@ import { GameMode, ModeContext } from "@/game/modes/GameMode";
 import { SoccerMode } from "@/game/modes/SoccerMode";
 import { SurvivorMode } from "@/game/modes/SurvivorMode";
 import { PetanqueMode } from "@/game/modes/PetanqueMode";
+import { CurlingMode } from "@/game/modes/CurlingMode";
+import { BowlingMode } from "@/game/modes/BowlingMode";
+import { BoulonsMode } from "@/game/modes/BoulonsMode";
 import { attachChat } from "@/ui/Chat";
 import { GAME_INFO, GameId } from "@/config/tournament";
 import { botKey } from "@/game/Tournament";
@@ -50,6 +53,12 @@ function createMode(game: GameId): GameMode {
       return new SurvivorMode();
     case "petanque":
       return new PetanqueMode();
+    case "curling":
+      return new CurlingMode();
+    case "bowling":
+      return new BowlingMode();
+    case "boulons":
+      return new BoulonsMode();
     default:
       throw new Error(`Game "${game}" is not implemented yet`);
   }
@@ -941,7 +950,7 @@ export class GameScene extends Phaser.Scene {
     while (this.stepAccumulatorMs >= FIXED_TIMESTEP_MS && steps < MAX_STEPS_PER_FRAME) {
       // Online, the world only moves during a resolution. Anywhere else the number of steps would depend
       // on how long each player took to aim, and the two devices would drift apart.
-      if (this.online && this.turnManager.phase !== "RESOLVING") {
+      if ((this.online || this.matchConfig.syncTest) && this.turnManager.phase !== "RESOLVING") {
         this.stepAccumulatorMs = 0;
         break;
       }

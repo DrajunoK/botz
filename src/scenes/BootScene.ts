@@ -63,7 +63,7 @@ export class BootScene extends Phaser.Scene {
   private startPreview(): boolean {
     const target = window.location.hash;
     if (target !== "#ranking" && target !== "#final") return false;
-    const tournament = new Tournament({ games: ALL_GAMES });
+    const tournament = new Tournament({ games: ALL_GAMES.slice(0, 3) });
     tournament.record({ game: "soccer", winner: "red", score: { red: 2, yellow: 1 } });
     if (target === "#final") {
       tournament.record({ game: "survivor", winner: "yellow", score: { red: 0, yellow: 1 } });
