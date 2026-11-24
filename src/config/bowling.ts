@@ -43,3 +43,7 @@ export const BUMPER_X_MAX = 940;
 /** Distance from the lane's centre line, at least and at most. */
 export const BUMPER_OFFSET_MIN = 62;
 export const BUMPER_OFFSET_MAX = 104;
+
+/** The lane tilts a little each frame: balls drift sideways by `DRIFT_STEP * level` px/step per step (level 1 to 3, either way). */
+export const DRIFT_STEP = 0.05;
+export const DRIFT_LEVELS = 3;

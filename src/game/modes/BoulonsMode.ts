@@ -23,6 +23,8 @@ import {
   PILE_MAX,
   PILE_RADIUS,
   PIT,
+  PIT_FLOOR_OFFSET,
+  EJECT_IMMUNE_STEPS,
   REFILL_BELOW,
   REFILL_PAIRS,
   SPAWN_X,
@@ -47,6 +49,8 @@ interface Bolt {
   state: BoltState;
   /** Whose pit it lies in, when `state` is "pit". */
   pit?: TeamId;
+  /** Steps left during which the pits ignore it (just thrown out by a bomb). */
+  immune: number;
 }
 
 const TEAMS: TeamId[] = ["red", "yellow"];
@@ -89,7 +93,7 @@ export class BoulonsMode implements GameMode {
       const body = scene.matter.add.circle(-500, -500, gold ? GOLD_RADIUS : BOLT_RADIUS, { ...BOLT_PHYSICS, label: "bolt" }) as MatterJS.BodyType;
       Body.setInertia(body, Infinity);
       scene.matter.world.remove(body);
-      this.bolts.push({ body, gold, state: "pool" });
+      this.bolts.push({ body, gold, state: "pool", immune: 0 });
     }
     this.bomb = scene.matter.add.circle(-500, -500, BOMB_RADIUS, { ...BOMB_PHYSICS, label: "bomb" }) as MatterJS.BodyType;
     Body.setInertia(this.bomb, Infinity);
@@ -156,6 +160,10 @@ export class BoulonsMode implements GameMode {
 
   afterStep(ctx: ModeContext): void {
     for (const bolt of this.onFloor()) {
+      if (bolt.immune > 0) {
+        bolt.immune -= 1;
+        continue;
+      }
       const { x, y } = bolt.body.position;
       const team = TEAMS.find((t) => inPit(PIT[t], x, y, BOLT_FALL_MARGIN));
       if (team) this.fall(bolt, team, x, y);
@@ -210,7 +218,7 @@ export class BoulonsMode implements GameMode {
         .filter((b) => b.state === "pit" && b.pit === t)
         .forEach((b, i) => {
           const s = pileSpot(i, PILE_RADIUS, PILE_MAX);
-          this.drawBolt(g, pit.x + s.x + 3, pit.y + s.y + 8, b.gold, 0.72, true);
+          this.drawBolt(g, pit.x + PIT_FLOOR_OFFSET.x + s.x, pit.y + PIT_FLOOR_OFFSET.y + s.y, b.gold, 1.05, true);
         });
     }
     for (const b of this.onFloor()) this.drawBolt(g, b.body.position.x, b.body.position.y, b.gold, 1, false, simTimeMs);
@@ -227,7 +235,7 @@ export class BoulonsMode implements GameMode {
       g.fillStyle(0xffd24a, 0.25 + 0.15 * Math.sin(simTimeMs / 220));
       g.fillCircle(x, y, r + 12);
     }
-    const fill = gold ? 0xffd24a : inPitView ? 0x59627c : 0x6b7690;
+    const fill = gold ? 0xffd24a : inPitView ? 0x7a85a6 : 0x6b7690;
     const edge = gold ? 0xb8861a : 0x2b2233;
     const pts: { x: number; y: number }[] = [];
     for (let i = 0; i < 6; i++) pts.push({ x: x + Math.cos((i * Math.PI) / 3 + Math.PI / 6) * r, y: y + Math.sin((i * Math.PI) / 3 + Math.PI / 6) * r });
@@ -337,6 +345,7 @@ export class BoulonsMode implements GameMode {
   private putOnFloor(bolt: Bolt, x: number, y: number, vx: number, vy: number): void {
     bolt.state = "floor";
     bolt.pit = undefined;
+    bolt.immune = 0;
     this.scene.matter.world.add(bolt.body);
     Body.setPosition(bolt.body, { x, y });
     Body.setVelocity(bolt.body, { x: vx, y: vy });
@@ -356,6 +365,7 @@ export class BoulonsMode implements GameMode {
     bolt.state = "pit";
     bolt.pit = team;
     this.scene.matter.world.remove(bolt.body);
+    this.dropAnimation(x, y, team, bolt.gold);
     this.popup(x, y, `+${bolt.gold ? GOLD_VALUE : 1}`, isHex(team === "red" ? 0xff8a84 : 0xf6c234), bolt.gold ? 44 : 34);
   }
 
@@ -366,10 +376,13 @@ export class BoulonsMode implements GameMode {
     this.bombBackAtTurn = this.turnsPlayed + BOMB_RETURN_TURNS;
     this.scene.matter.world.remove(this.bomb);
 
+    // They fly out towards the middle of the arena (the pit sits against a wall), starting on the rim.
+    const towards = team === "red" ? 0 : Math.PI;
     for (const bolt of this.bolts.filter((b) => b.state === "pit" && b.pit === team)) {
-      const a = ctx.rng.next() * Math.PI * 2;
+      const a = towards + (ctx.rng.next() * 2 - 1) * 1.3;
       const v = EJECT_SPEED_MIN + ctx.rng.next() * (EJECT_SPEED_MAX - EJECT_SPEED_MIN);
-      this.putOnFloor(bolt, pit.x + Math.cos(a) * 30, pit.y + Math.sin(a) * 30, Math.cos(a) * v, Math.sin(a) * v);
+      this.putOnFloor(bolt, pit.x + Math.cos(a) * (pit.r + 18), pit.y + Math.sin(a) * (pit.r + 18), Math.cos(a) * v, Math.sin(a) * v);
+      bolt.immune = EJECT_IMMUNE_STEPS;
     }
     const shove = (body: MatterJS.BodyType) => {
       const dx = body.position.x - pit.x;
@@ -387,6 +400,32 @@ export class BoulonsMode implements GameMode {
     const flash = this.scene.add.circle(pit.x, pit.y, 40, 0xffb547, 0.9).setDepth(110);
     this.scene.tweens.add({ targets: flash, scale: BLAST_RADIUS / 40, alpha: 0, duration: 500, ease: "Quad.Out", onComplete: () => flash.destroy() });
     this.popup(pit.x, pit.y - 10, "BOUM !", "#ffffff", 56);
+  }
+
+  /** The bolt tumbles down the hole: it spins, shrinks and darkens, and a ripple spreads at the rim. */
+  private dropAnimation(x: number, y: number, team: TeamId, gold: boolean): void {
+    const pit = PIT[team];
+    const r = gold ? GOLD_RADIUS : BOLT_RADIUS;
+    const g = this.scene.add.graphics().setDepth(104).setPosition(x, y);
+    const pts: { x: number; y: number }[] = [];
+    for (let i = 0; i < 6; i++) pts.push({ x: Math.cos((i * Math.PI) / 3 + Math.PI / 6) * r, y: Math.sin((i * Math.PI) / 3 + Math.PI / 6) * r });
+    g.fillStyle(gold ? 0xffd24a : 0x6b7690, 1);
+    g.fillPoints(pts, true);
+    g.lineStyle(3, 0x2b2233, 1);
+    g.strokePoints(pts, true);
+    this.scene.tweens.add({
+      targets: g,
+      x: pit.x + PIT_FLOOR_OFFSET.x * 0.6,
+      y: pit.y + PIT_FLOOR_OFFSET.y * 0.6,
+      scale: 0.35,
+      angle: 400,
+      alpha: 0.15,
+      duration: 420,
+      ease: "Cubic.In",
+      onComplete: () => g.destroy(),
+    });
+    const ring = this.scene.add.circle(pit.x, pit.y, pit.r * 0.5, 0xffffff, 0).setStrokeStyle(4, 0xffffff, 0.7).setDepth(103);
+    this.scene.tweens.add({ targets: ring, scale: 1.5, alpha: 0, duration: 520, delay: 250, ease: "Quad.Out", onComplete: () => ring.destroy() });
   }
 
   private popup(x: number, y: number, label: string, color: string, size: number): void {

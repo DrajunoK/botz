@@ -69,3 +69,23 @@ export function pathClears(from: Spot, to: Spot, post: Spot, clearance: number):
 /** Points for the pins that fell: one each, the golden one worth `goldValue`. */
 export const pinPoints = (fallen: readonly number[], goldIndex: number, goldValue: number): number =>
   fallen.reduce((sum, i) => sum + (i === goldIndex ? goldValue : 1), 0);
+
+/**
+ * How far sideways a ball is pushed by a constant `accel` (px/step per step) while it travels `distance`
+ * along the lane, launched at `speed` px/step and slowed by air friction `friction` each step. The AI
+ * aims against it.
+ */
+export function driftDisplacement(speed: number, distance: number, accel: number, friction: number): number {
+  let x = 0;
+  let vx = speed;
+  let y = 0;
+  let vy = 0;
+  for (let step = 0; step < 600 && x < distance; step++) {
+    vx *= 1 - friction;
+    vy = (vy + accel) * (1 - friction);
+    x += vx;
+    y += vy;
+    if (vx < 0.05) break;
+  }
+  return y;
+}

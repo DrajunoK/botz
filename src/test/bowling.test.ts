@@ -47,3 +47,16 @@ describe("bowling extras", () => {
     expect(Math.hypot(b[0].x - b[1].x, b[0].dy - b[1].dy)).toBeGreaterThanOrEqual(120);
   });
 });
+
+import { driftDisplacement } from "@/game/bowling";
+
+describe("lane drift", () => {
+  it("pushes further the longer the ball takes, and in the direction of the push", () => {
+    const near = driftDisplacement(44, 400, 0.1, 0.035);
+    const far = driftDisplacement(44, 850, 0.1, 0.035);
+    expect(far).toBeGreaterThan(near);
+    expect(near).toBeGreaterThan(0);
+    expect(driftDisplacement(44, 850, -0.1, 0.035)).toBeCloseTo(-far, 5);
+    expect(driftDisplacement(44, 850, 0, 0.035)).toBe(0);
+  });
+});

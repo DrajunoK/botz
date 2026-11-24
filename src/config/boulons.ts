@@ -18,7 +18,11 @@ export const BOLT_FALL_MARGIN = 0;
 export const BOT_FALL_MARGIN = 24;
 export const BOMB_FALL_MARGIN = 8;
 /** Bolts piled in a pit are drawn inside this radius. */
-export const PILE_RADIUS = 76;
+export const PILE_RADIUS = 58;
+/** Offset of the bottom of the hole from the rim's centre (the hole is drawn with depth). */
+export const PIT_FLOOR_OFFSET = { x: 10, y: 19 } as const;
+/** A bolt thrown out by a bomb ignores the pits for this many steps, so it can leave. */
+export const EJECT_IMMUNE_STEPS = 50;
 export const PILE_MAX = 26;
 
 /** The bomb: pushed into a pit it explodes, throwing the bolts of that pit back out and shoving what is near. */
