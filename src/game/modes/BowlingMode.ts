@@ -2,9 +2,6 @@ import Phaser from "phaser";
 import { BOTZ_PER_TEAM, GAME_WIDTH, TEAM_COLORS, TeamId } from "@/config/game";
 import {
   BUMPERS_PER_FRAME,
-  DRIFT_LEVELS,
-  DRIFT_STEP,
-  FOUL_LINE_X,
   BUMPER_OFFSET_MAX,
   BUMPER_OFFSET_MIN,
   BUMPER_RADIUS,
@@ -18,24 +15,28 @@ import {
   HEAD_PIN_X,
   LANE_CENTER,
   PIN_COUNT,
+  SCATTER_DY_MAX,
+  SCATTER_GAP,
+  SCATTER_X_MAX,
+  SCATTER_X_MIN,
   SHOT_SPEED_SCALE,
   START_X,
   WALL_RESTITUTION,
 } from "@/config/bowling";
-import { BOT_PHYSICS, BOT_RADIUS, MAX_SHOT_SPEED } from "@/config/physics";
+import { BOT_RADIUS, MAX_SHOT_SPEED } from "@/config/physics";
 import { NOISE_BY_DIFFICULTY } from "@/game/AIController";
 import { GameMode, ModeAIContext, ModeContext } from "./GameMode";
 import { BowlingField } from "@/game/field/BowlingField";
 import { PinRack } from "@/game/entities/PinRack";
 import type { Bot } from "@/game/entities/Bot";
-import { Bumper, bowlingWinner, driftDisplacement, inGutter, pathClears, pickBumpers, pinPoints, rackSpots } from "@/game/bowling";
+import { Bumper, bowlingWinner, inGutter, pathClears, pickBumpers, pinPoints, rackSpots, scatterPins } from "@/game/bowling";
 import { Body } from "@/game/util/matter";
 import { bodyText, titleText } from "@/ui/ui";
 
 const TEAMS: TeamId[] = ["red", "yellow"];
 
 /**
- * Bowling with a twist: each team has its own lane and ten pins, and gets ONE throw per frame, six
+ * Bowling with a twist: each team has its own lane and ten pins, scattered differently every frame (the same on both lanes), and gets ONE throw per frame, six
  * frames. Every frame, round bumpers stand in the lanes (the same ones on both) and one pin is golden
  * (worth 3). The pins are heavy, so a strike takes a well-placed shot. More pins wins; a tie plays one
  * more frame.
@@ -58,8 +59,6 @@ export class BowlingMode implements GameMode {
   private bumpers: Bumper[] = [];
   private bumperBodies: Record<TeamId, MatterJS.BodyType[]> = { red: [], yellow: [] };
   private bumperActive = false;
-  /** Sideways push on the balls this frame (px/step per step; negative = towards the top of the screen). */
-  private drift = 0;
   private banner: Phaser.GameObjects.GameObject[] = [];
 
   buildField(scene: Phaser.Scene): void {
@@ -71,7 +70,6 @@ export class BowlingMode implements GameMode {
     this.goldIndex = -1;
     this.bumpers = [];
     this.bumperActive = false;
-    this.drift = 0;
     this.banner = [];
     new BowlingField(scene);
     this.racks = {
@@ -122,8 +120,12 @@ export class BowlingMode implements GameMode {
     this.bumperActive = true;
     const next = () => ctx.rng.next();
     this.goldIndex = Math.floor(next() * PIN_COUNT);
-    const level = 1 + Math.floor(next() * DRIFT_LEVELS);
-    this.drift = (next() < 0.5 ? -1 : 1) * level * DRIFT_STEP;
+    // Same loose pile on both lanes.
+    const pile = scatterPins(next, PIN_COUNT, SCATTER_X_MIN, SCATTER_X_MAX, SCATTER_DY_MAX, SCATTER_GAP);
+    for (const team of TEAMS) {
+      this.racks[team].setSpots(pile.map((p) => ({ x: p.x, y: LANE_CENTER[team] + p.dy })));
+      this.racks[team].reset();
+    }
     this.bumpers = pickBumpers(next, BUMPERS_PER_FRAME, BUMPER_X_MIN, BUMPER_X_MAX, BUMPER_OFFSET_MIN, BUMPER_OFFSET_MAX, BUMPER_RADIUS * 4);
     for (const team of TEAMS) {
       this.bumpers.forEach((b, i) => {
@@ -136,16 +138,13 @@ export class BowlingMode implements GameMode {
 
   notice(): { text: string } {
     const extra = this.frame > FRAMES ? "Manche bonus" : `Manche ${this.frame}/${FRAMES}`;
-    const level = Math.round(Math.abs(this.drift) / DRIFT_STEP);
-    const arrows = (this.drift < 0 ? "▲" : "▼").repeat(Math.max(1, level));
-    return { text: `${extra} · dévers ${arrows}` };
+    return { text: `${extra} · quille dorée = ${GOLD_PIN_VALUE}` };
   }
 
   /** A ball that drops into a gutter keeps rolling straight down it: it can never reach the pins. */
   afterStep(ctx: ModeContext): void {
     for (const b of ctx.bots) {
       if (b.eliminated) continue;
-      if (b.body.position.x > FOUL_LINE_X) Body.setVelocity(b.body, { x: b.body.velocity.x, y: b.body.velocity.y + this.drift });
       const cy = LANE_CENTER[b.team];
       const { x, y } = b.body.position;
       if (!inGutter(y, cy, GUTTER_EDGE)) continue;
@@ -195,18 +194,6 @@ export class BowlingMode implements GameMode {
     for (const t of TEAMS) {
       this.racks[t].draw(g, this.goldIndex);
       if (this.bumperActive) for (const b of this.bumpers) this.drawBumper(g, b.x, LANE_CENTER[t] + b.dy);
-      if (this.bumperActive) this.drawDrift(g, LANE_CENTER[t]);
-    }
-  }
-
-  /** Arrows on the approach showing which way the lane tilts and how much. */
-  private drawDrift(g: Phaser.GameObjects.Graphics, cy: number): void {
-    const level = Math.round(Math.abs(this.drift) / DRIFT_STEP);
-    const dir = this.drift < 0 ? -1 : 1;
-    g.fillStyle(0x7a4f26, 0.75);
-    for (let i = 0; i < level; i++) {
-      const x = 172 + i * 22;
-      g.fillTriangle(x, cy + dir * 14, x - 9, cy - dir * 8, x + 9, cy - dir * 8);
     }
   }
 
@@ -238,9 +225,7 @@ export class BowlingMode implements GameMode {
       const clear = byFront.find((p) => posts.every((post) => pathClears(from, p, post, BUMPER_RADIUS + BOT_RADIUS + 4)));
       const front = clear ?? byFront[0] ?? { x: HEAD_PIN_X, y: cy };
       const speed = Math.min(MAX_SHOT_SPEED, MAX_SHOT_SPEED * (0.97 - ctx.rng() * noise.power * 0.1));
-      // The lane tilts: aim against the drift the ball will pick up on the way.
-      const lean = driftDisplacement(speed * SHOT_SPEED_SCALE, front.x - bot.x, this.drift, BOT_PHYSICS.frictionAir);
-      const target = { x: front.x, y: front.y + (front.y > cy ? -6 : 6) - lean };
+      const target = { x: front.x, y: front.y + (front.y > cy ? -6 : 6) };
       const angle = (ctx.rng() * 2 - 1) * noise.angleDeg * (Math.PI / 180);
       const dx = target.x - bot.x;
       const dy = target.y - bot.y;

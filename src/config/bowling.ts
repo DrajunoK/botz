@@ -44,6 +44,8 @@ export const BUMPER_X_MAX = 940;
 export const BUMPER_OFFSET_MIN = 62;
 export const BUMPER_OFFSET_MAX = 104;
 
-/** The lane tilts a little each frame: balls drift sideways by `DRIFT_STEP * level` px/step per step (level 1 to 3, either way). */
-export const DRIFT_STEP = 0.05;
-export const DRIFT_LEVELS = 3;
+/** The pins are scattered over this part of the pin deck every frame, never closer than `SCATTER_GAP`. */
+export const SCATTER_X_MIN = 1050;
+export const SCATTER_X_MAX = 1350;
+export const SCATTER_DY_MAX = LANE_HALF - PIN_RADIUS - 10;
+export const SCATTER_GAP = 44;

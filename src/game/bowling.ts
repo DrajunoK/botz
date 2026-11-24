@@ -70,22 +70,29 @@ export function pathClears(from: Spot, to: Spot, post: Spot, clearance: number):
 export const pinPoints = (fallen: readonly number[], goldIndex: number, goldValue: number): number =>
   fallen.reduce((sum, i) => sum + (i === goldIndex ? goldValue : 1), 0);
 
+export interface Scatter {
+  x: number;
+  /** Offset from the lane's centre line (the same pattern is used on both lanes). */
+  dy: number;
+}
+
 /**
- * How far sideways a ball is pushed by a constant `accel` (px/step per step) while it travels `distance`
- * along the lane, launched at `speed` px/step and slowed by air friction `friction` each step. The AI
- * aims against it.
+ * Ten pins scattered over the pin deck instead of a neat triangle: no two closer than `minGap`.
+ * `next` is the seeded generator, so both devices set up the same pins. If the area gets too crowded
+ * for the gap, the remaining pins fall back to a loose grid so there are always `count` of them.
  */
-export function driftDisplacement(speed: number, distance: number, accel: number, friction: number): number {
-  let x = 0;
-  let vx = speed;
-  let y = 0;
-  let vy = 0;
-  for (let step = 0; step < 600 && x < distance; step++) {
-    vx *= 1 - friction;
-    vy = (vy + accel) * (1 - friction);
-    x += vx;
-    y += vy;
-    if (vx < 0.05) break;
+export function scatterPins(next: () => number, count: number, xMin: number, xMax: number, dyMax: number, minGap: number): Scatter[] {
+  const out: Scatter[] = [];
+  for (let i = 0; i < count; i++) {
+    let placed = false;
+    for (let attempt = 0; attempt < 80 && !placed; attempt++) {
+      const p = { x: xMin + next() * (xMax - xMin), dy: (next() * 2 - 1) * dyMax };
+      if (out.every((o) => Math.hypot(o.x - p.x, o.dy - p.dy) >= minGap)) {
+        out.push(p);
+        placed = true;
+      }
+    }
+    if (!placed) out.push({ x: xMin + (i % 5) * ((xMax - xMin) / 4), dy: ((Math.floor(i / 5) % 2) * 2 - 1) * dyMax * 0.5 });
   }
-  return y;
+  return out;
 }

@@ -48,15 +48,25 @@ describe("bowling extras", () => {
   });
 });
 
-import { driftDisplacement } from "@/game/bowling";
+import { scatterPins } from "@/game/bowling";
 
-describe("lane drift", () => {
-  it("pushes further the longer the ball takes, and in the direction of the push", () => {
-    const near = driftDisplacement(44, 400, 0.1, 0.035);
-    const far = driftDisplacement(44, 850, 0.1, 0.035);
-    expect(far).toBeGreaterThan(near);
-    expect(near).toBeGreaterThan(0);
-    expect(driftDisplacement(44, 850, -0.1, 0.035)).toBeCloseTo(-far, 5);
-    expect(driftDisplacement(44, 850, 0, 0.035)).toBe(0);
+describe("scattered pins", () => {
+  it("places ten pins apart from each other inside the deck, the same for the same seed", () => {
+    const make = () => {
+      let s = 11;
+      const next = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+      return scatterPins(next, 10, 1050, 1350, 100, 44);
+    };
+    const a = make();
+    expect(a).toHaveLength(10);
+    for (const p of a) {
+      expect(p.x).toBeGreaterThanOrEqual(1050);
+      expect(p.x).toBeLessThanOrEqual(1350);
+      expect(Math.abs(p.dy)).toBeLessThanOrEqual(100);
+    }
+    for (let i = 0; i < a.length; i++) for (let j = i + 1; j < a.length; j++) {
+      expect(Math.hypot(a[i].x - a[j].x, a[i].dy - a[j].dy)).toBeGreaterThanOrEqual(44);
+    }
+    expect(make()).toEqual(a);
   });
 });

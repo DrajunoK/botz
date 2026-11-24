@@ -8,7 +8,10 @@ export class PinRack {
   private readonly bodies: MatterJS.BodyType[];
   private readonly inPlay: boolean[];
 
-  constructor(private readonly scene: Phaser.Scene, readonly spots: readonly Spot[]) {
+  spots: readonly Spot[];
+
+  constructor(private readonly scene: Phaser.Scene, spots: readonly Spot[]) {
+    this.spots = spots;
     this.bodies = spots.map((s) => {
       const body = scene.matter.add.circle(s.x, s.y, PIN_RADIUS, { ...PIN_PHYSICS, label: "pin" }) as MatterJS.BodyType;
       Body.setInertia(body, Infinity);
@@ -45,6 +48,11 @@ export class PinRack {
   clearKnocked(fallen: readonly number[]): void {
     for (const i of fallen) this.take(i);
     for (const [i, b] of this.active()) this.place(b, this.spots[i]);
+  }
+
+  /** Changes where the ten pins stand; call `reset()` afterwards to put them there. */
+  setSpots(spots: readonly Spot[]): void {
+    this.spots = spots;
   }
 
   /** A fresh rack of ten. */
