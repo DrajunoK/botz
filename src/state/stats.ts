@@ -136,11 +136,11 @@ export class StatsStore {
     return record;
   }
 
-  recordTournament(tournament: { id: string; mode: StatsMode; winner: TeamId | null }): TournamentRecord {
+  recordTournament(tournament: { id: string; mode: StatsMode; winner: TeamId | null; player?: TeamId }): TournamentRecord {
     const record: TournamentRecord = {
       id: tournament.id,
       mode: tournament.mode,
-      result: outcomeFor(tournament.winner),
+      result: outcomeFor(tournament.winner, tournament.player),
       playedAt: new Date().toISOString(),
       synced: false,
     };

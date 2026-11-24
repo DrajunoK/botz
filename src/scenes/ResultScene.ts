@@ -5,6 +5,7 @@ import { COLORS } from "@/config/theme";
 import { SceneKeys } from "./keys";
 import { createButton } from "@/ui/Button";
 import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
+import { attachChat } from "@/ui/Chat";
 import { MatchConfig, newSeed } from "@/game/MatchConfig";
 import { drawBot, drawBotShadow, drawSmoke } from "@/game/view/botArt";
 import { fillSpark } from "@/game/view/draw";
@@ -119,6 +120,7 @@ export class ResultScene extends Phaser.Scene {
       if (this.resultData.matchConfig.onlineAutoplay) this.time.delayedCall(1500, askRematch);
     }
 
+    attachChat(this, online, GAME_WIDTH - 60, 60);
     online.onRematch = ({ seed }) => this.scene.start(SceneKeys.Game, { ...this.resultData.matchConfig, seed });
     online.onPeerAway = () => note.setText("Ton adversaire est déconnecté…");
     online.onPeerBack = () => note.setText("");

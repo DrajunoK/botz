@@ -241,3 +241,17 @@ describe("rematch", () => {
     expect(started).not.toHaveBeenCalled();
   });
 });
+
+describe("quick messages", () => {
+  it("reaches the opponent once the match runs, and a tournament schedule reaches the guest", () => {
+    const p = pair();
+    const onStart = vi.fn();
+    p.guest.onStart = onStart;
+    p.host.offerMatch("soccer", 1, ["soccer", "petanque", "survivor"]);
+    expect(onStart).toHaveBeenCalledWith({ game: "soccer", seed: 1, games: ["soccer", "petanque", "survivor"] });
+    const heard = vi.fn();
+    p.guest.onSay = heard;
+    p.host.say(2);
+    expect(heard).toHaveBeenCalledWith(2);
+  });
+});

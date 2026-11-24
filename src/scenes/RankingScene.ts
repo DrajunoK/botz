@@ -1,13 +1,15 @@
 import Phaser from "phaser";
-import { GAME_HEIGHT, GAME_WIDTH, TEAM_COLORS, TEAM_LABEL, TeamId } from "@/config/game";
+import { ONLINE_RANKING_MS, GAME_HEIGHT, GAME_WIDTH, TEAM_COLORS, TEAM_LABEL, TeamId } from "@/config/game";
 import { ALL_PARTS } from "@/config/parts";
 import { COLORS } from "@/config/theme";
 import { GAME_INFO } from "@/config/tournament";
+import { attachChat } from "@/ui/Chat";
 import { SceneKeys } from "./keys";
 import { createButton } from "@/ui/Button";
 import { bodyText, drawPill, hex, titleText } from "@/ui/ui";
 import { MatchConfig, newSeed, playerName } from "@/game/MatchConfig";
 import { Tournament } from "@/game/Tournament";
+import type { OnlineSession } from "@/net/OnlineSession";
 import { drawBot, drawBotShadow } from "@/game/view/botArt";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 import { centerOnDesignArea } from "@/ui/viewport";
@@ -279,6 +281,11 @@ export class RankingScene extends Phaser.Scene {
   private addButtons(final: boolean): void {
     const cy = Y(385);
     const h = 46 * S;
+    const online = this.matchConfig.online;
+    if (online) {
+      this.addOnlineButtons(online, final, cy, h);
+      return;
+    }
     if (final) {
       createButton(this, X(32 + 120), cy, "Menu", () => this.scene.start(SceneKeys.Menu), { variant: "ghost", width: X(240), height: h, fontSize: Math.round(17 * S) });
       createButton(this, X(900 - 140), cy, "Revanche", () => this.rematch(), { variant: "primary", width: X(280), height: h, fontSize: Math.round(19 * S) });
@@ -295,14 +302,78 @@ export class RankingScene extends Phaser.Scene {
     });
   }
 
-  private startNextGame(): void {
-    const config: MatchConfig = { ...this.matchConfig, gameId: this.tournament.currentGame!, seed: newSeed() };
+  /** Online, the next game (or the rematch) starts when both players asked for it, like a rematch in free play. */
+  private addOnlineButtons(online: OnlineSession, final: boolean, cy: number, h: number): void {
+    const note = this.add.text(X(466), cy, "", bodyText(Math.round(17 * S), COLORS.textMuted, "600")).setOrigin(0.5);
+    let go: Phaser.GameObjects.Container | undefined;
+    const leave = () => {
+      online.leave();
+      this.scene.start(SceneKeys.Menu);
+    };
+    const gone = () => {
+      go?.destroy();
+      go = undefined;
+      note.setText("Ton adversaire est parti");
+    };
+    const ask = () => {
+      online.askRematch();
+      go?.destroy();
+      go = undefined;
+      note.setText("En attente de ton adversaire…");
+    };
+
+    if (final) {
+      createButton(this, X(32 + 120), cy, "Menu", leave, { variant: "ghost", width: X(240), height: h, fontSize: Math.round(17 * S) });
+    } else {
+      createButton(this, X(32 + 84), cy, "Quitter le tournoi", leave, { variant: "ghost", width: X(168), height: h, fontSize: Math.round(15 * S) });
+    }
+    if (online.isClosed) {
+      gone();
+    } else if (final) {
+      go = createButton(this, X(900 - 140), cy, "Revanche", ask, { variant: "primary", width: X(280), height: h, fontSize: Math.round(19 * S) });
+    } else {
+      const next = GAME_INFO[this.tournament.currentGame!].name;
+      go = createButton(this, X(900 - 132), cy, `Jeu suivant : ${next}  →`, ask, { variant: "primary", width: X(264), height: h, fontSize: Math.round(17 * S) });
+    }
+    if (go && this.matchConfig.onlineAutoplay) this.time.delayedCall(1500, ask);
+    attachChat(this, online, GAME_WIDTH - 60, 60);
+    if (go && !final) {
+      // Same rhythm as the game: no waiting around, the next game is requested when the clock runs out.
+      let left = Math.round(ONLINE_RANKING_MS / 1000);
+      const show = () => note.setText(`Jeu suivant dans ${left} s`);
+      show();
+      this.time.addEvent({
+        delay: 1000,
+        repeat: left - 1,
+        callback: () => {
+          if (!go) return;
+          left -= 1;
+          if (left <= 0) ask();
+          else show();
+        },
+      });
+    }
+
+    online.onRematch = ({ seed }) => (final ? this.rematch(seed) : this.startNextGame(seed));
+    online.onPeerAway = () => note.setText("Ton adversaire est déconnecté…");
+    online.onPeerBack = () => note.setText("");
+    online.onPeerLeft = gone;
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      online.onRematch = undefined;
+      online.onPeerAway = undefined;
+      online.onPeerBack = undefined;
+      online.onPeerLeft = undefined;
+    });
+  }
+
+  private startNextGame(seed = newSeed()): void {
+    const config: MatchConfig = { ...this.matchConfig, gameId: this.tournament.currentGame!, seed };
     this.scene.start(SceneKeys.Game, config);
   }
 
-  private rematch(): void {
+  private rematch(seed = newSeed()): void {
     const tournament = new Tournament({ games: this.tournament.games, repairBetweenGames: this.tournament.repairBetweenGames });
-    const config: MatchConfig = { ...this.matchConfig, tournament, gameId: tournament.currentGame!, seed: newSeed() };
+    const config: MatchConfig = { ...this.matchConfig, tournament, gameId: tournament.currentGame!, seed };
     this.scene.start(SceneKeys.Game, config);
   }
 

@@ -12,6 +12,8 @@ export interface ButtonOptions {
   fontSize?: number;
   /** Round button (the GO button): width is the diameter, label uses the title font. */
   round?: boolean;
+  /** Small second line under the label, e.g. "(local)". */
+  subLabel?: string;
 }
 
 interface Look {
@@ -76,6 +78,11 @@ export function createButton(
   const text = scene.add.text(0, round ? 2 : 0, label, style).setOrigin(0.5);
 
   const face = scene.add.container(0, 0, [bg, text]);
+  if (options.subLabel) {
+    const size = Math.round((options.fontSize ?? 30) * 0.58);
+    text.setY(-size * 0.55);
+    face.add(scene.add.text(0, (options.fontSize ?? 30) * 0.5 + 2, options.subLabel, bodyText(size, look.text, "500")).setOrigin(0.5).setAlpha(0.8));
+  }
   const container = scene.add.container(x, y, [edge, face]);
   container.setSize(width, height + depth);
 

@@ -43,3 +43,5 @@ export type Difficulty = "easy" | "normal" | "hard";
 
 /** Aiming phase duration in an online match: both players think at once, on separate screens. */
 export const ONLINE_AIM_DURATION_MS = 30_000;
+/** Online tournament: time on the ranking screen before the next game is requested for you. */
+export const ONLINE_RANKING_MS = 30_000;

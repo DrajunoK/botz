@@ -1,3 +1,4 @@
+import { QUICK_MESSAGES } from "@/config/chat";
 import { GameId, PLAYABLE_GAMES } from "@/config/tournament";
 
 /**
@@ -17,7 +18,8 @@ export interface AimShot {
  * before a rematch, is dropped.
  */
 export type OnlineMessage =
-  | { t: "start"; game: GameId; seed: number }
+  /** `games` is the schedule of a tournament (the first one is `game`); absent for a single game. */
+  | { t: "start"; game: GameId; seed: number; games?: GameId[] }
   | { t: "ready" }
   | { t: "aims"; m: number; turn: number; shots: AimShot[] }
   /** Host only: the world at the end of a turn, so the guest can notice (and repair) a drift. */
@@ -25,6 +27,8 @@ export type OnlineMessage =
   /** "I want a rematch"; the host answers with `go` once both sides asked. */
   | { t: "rematch" }
   | { t: "go"; seed: number }
+  /** A quick message (index into QUICK_MESSAGES). Best effort: never re-sent. */
+  | { t: "say"; id: number }
   | { t: "leave" };
 
 export const MAX_SNAPSHOT_VALUES = 4000;
@@ -63,7 +67,15 @@ export function parseEnvelope(raw: unknown): Envelope | null {
   switch (m.t) {
     case "start":
       if (typeof m.game !== "string" || !(PLAYABLE_GAMES as readonly string[]).includes(m.game) || !isNum(m.seed)) return null;
-      return { from, msg: { t: "start", game: m.game as GameId, seed: m.seed >>> 0 } };
+    {
+      const ok = (g: unknown): g is GameId => typeof g === "string" && (PLAYABLE_GAMES as readonly string[]).includes(g);
+      let games: GameId[] | undefined;
+      if (m.games !== undefined) {
+        if (!Array.isArray(m.games) || m.games.length === 0 || m.games.length > 10 || !m.games.every(ok)) return null;
+        games = m.games as GameId[];
+      }
+      return { from, msg: { t: "start", game: m.game as GameId, seed: m.seed >>> 0, ...(games ? { games } : {}) } };
+    }
     case "ready":
     case "rematch":
     case "leave":
@@ -83,6 +95,9 @@ export function parseEnvelope(raw: unknown): Envelope | null {
       if (!isNum(m.m) || !isNum(m.turn) || !Array.isArray(m.values) || m.values.length > MAX_SNAPSHOT_VALUES) return null;
       if (!m.values.every(isNum)) return null;
       return { from, msg: { t: "snap", m: m.m, turn: m.turn, values: m.values as number[] } };
+    case "say":
+      if (!isNum(m.id) || !Number.isInteger(m.id) || m.id < 0 || m.id >= QUICK_MESSAGES.length) return null;
+      return { from, msg: { t: "say", id: m.id } };
     case "go":
       if (!isNum(m.seed)) return null;
       return { from, msg: { t: "go", seed: m.seed >>> 0 } };

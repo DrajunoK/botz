@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { AIM_DURATION_MS, GAME_WIDTH, ONLINE_AIM_DURATION_MS, TEAM_LABEL, TeamId } from "@/config/game";
+import { AIM_DURATION_MS, GAME_WIDTH, ONLINE_AIM_DURATION_MS, OPPOSITE_TEAM, TEAM_LABEL, TeamId } from "@/config/game";
 import { ALARM } from "@/config/alarmClock";
 import { CLOCK_RADIUS, FIXED_TIMESTEP_MS, MAX_SHOT_SPEED, MAX_STEPS_PER_FRAME } from "@/config/physics";
 import { DEBRIS, REPAIR_ON_GOAL } from "@/config/parts";
@@ -9,6 +9,7 @@ import { GameMode, ModeContext } from "@/game/modes/GameMode";
 import { SoccerMode } from "@/game/modes/SoccerMode";
 import { SurvivorMode } from "@/game/modes/SurvivorMode";
 import { PetanqueMode } from "@/game/modes/PetanqueMode";
+import { attachChat } from "@/ui/Chat";
 import { GAME_INFO, GameId } from "@/config/tournament";
 import { botKey } from "@/game/Tournament";
 import { Stats, statsMode } from "@/state/stats";
@@ -209,7 +210,10 @@ export class GameScene extends Phaser.Scene {
     if (this.matchConfig.mode === "passPlay" || (this.online && this.localTeam === "yellow")) {
       this.yellowController = makeController(this.yellowBots);
     }
-    if (this.online) this.watchOpponent(this.online);
+    if (this.online) {
+      this.watchOpponent(this.online);
+      attachChat(this, this.online, 58, 150);
+    }
 
     this.matter.world.on("collisionstart", (event: Phaser.Physics.Matter.Events.CollisionStartEvent) => {
       for (const pair of event.pairs) this.recordImpact(pair);
@@ -581,6 +585,8 @@ export class GameScene extends Phaser.Scene {
     }
     const score = { ...this.turnManager.score };
     const { tournament, gameId } = this.matchConfig;
+    // A forfeit can leave the score level: the player who stayed still has to come out ahead.
+    if (tournament && score[winner] <= score[OPPOSITE_TEAM[winner]]) score[winner] = score[OPPOSITE_TEAM[winner]] + 1;
     this.online?.endMatch();
     this.recordStats(winner, score);
     if (tournament) {
@@ -608,7 +614,7 @@ export class GameScene extends Phaser.Scene {
       const trophies = { ...tournament.trophies };
       trophies[winner] += 1;
       const tournamentWinner = trophies.red === trophies.yellow ? null : trophies.red > trophies.yellow ? "red" : "yellow";
-      Stats.recordTournament({ id: tournament.id, mode: statsMode(mode), winner: tournamentWinner });
+      Stats.recordTournament({ id: tournament.id, mode: statsMode(mode), winner: tournamentWinner, player: this.online?.team });
     }
     void syncStats();
   }

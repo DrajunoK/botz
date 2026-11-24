@@ -3,6 +3,8 @@ import { GAME_HEIGHT, GAME_WIDTH } from "@/config/game";
 import { COLORS } from "@/config/theme";
 import { WORLD_LEFT, WORLD_WIDTH } from "@/config/viewport";
 import { GAME_INFO, GameId } from "@/config/tournament";
+import { Rng } from "@/game/Rng";
+import { Tournament } from "@/game/Tournament";
 import { MatchConfig, newSeed } from "@/game/MatchConfig";
 import { OnlineSession } from "@/net/OnlineSession";
 import { makeRoomCode, normalizeRoomCode, roomLink } from "@/net/protocol";
@@ -21,6 +23,8 @@ export interface LobbyData {
   localRoom?: LocalRoomLink;
   /** An invite link (`?room=AB3K`) was opened: join this room straight away. */
   joinCode?: string;
+  /** Host only: offer a whole tournament (3 random games) instead of the single `gameId`. */
+  tournament?: boolean;
 }
 
 /** A guest who hears nothing from the room this long is told it does not exist (or is not waiting). */
@@ -38,6 +42,7 @@ export class LobbyScene extends Phaser.Scene {
   private autoplay = false;
   private drift = false;
   private joinCode?: string;
+  private wantsTournament = false;
   private pendingLocalRoom?: LocalRoomLink;
 
   constructor() {
@@ -49,6 +54,7 @@ export class LobbyScene extends Phaser.Scene {
     this.autoplay = data.localRoom?.autoplay ?? false;
     this.drift = data.localRoom?.drift ?? false;
     this.joinCode = data.joinCode;
+    this.wantsTournament = data.tournament ?? false;
     this.pendingLocalRoom = data.localRoom;
     this.session = undefined;
     this.handedOver = false;
@@ -82,7 +88,8 @@ export class LobbyScene extends Phaser.Scene {
 
   private heading(add: (o: Phaser.GameObjects.GameObject) => void, subtitle: string): void {
     add(this.add.text(GAME_WIDTH / 2, 150, "EN LIGNE", titleText(84, hex(COLORS.yellow))).setOrigin(0.5));
-    add(this.add.text(GAME_WIDTH / 2, 235, `${GAME_INFO[this.gameId].name} · ${subtitle}`, bodyText(32, COLORS.textMuted, "600")).setOrigin(0.5));
+    const what = this.wantsTournament ? "Tournoi" : GAME_INFO[this.gameId].name;
+    add(this.add.text(GAME_WIDTH / 2, 235, `${what} · ${subtitle}`, bodyText(32, COLORS.textMuted, "600")).setOrigin(0.5));
   }
 
   private showChoice(): void {
@@ -112,8 +119,14 @@ export class LobbyScene extends Phaser.Scene {
     const room = openRoom(code, clientId);
     const session = new OnlineSession(room, "host", clientId);
     this.session = session;
-    session.onStart = ({ game, seed }) => this.launch(session, game, seed);
-    session.offerMatch(this.gameId, newSeed());
+    session.onStart = ({ game, seed, games }) => this.launch(session, game, seed, games);
+    const seed = newSeed();
+    if (this.wantsTournament) {
+      const games = [...new Tournament({ rng: new Rng(seed) }).games];
+      session.offerMatch(games[0], seed, games);
+    } else {
+      session.offerMatch(this.gameId, seed);
+    }
 
     this.show((add) => {
       this.heading(add, "ta salle");
@@ -164,7 +177,7 @@ export class LobbyScene extends Phaser.Scene {
     const room = openRoom(code, clientId);
     const session = new OnlineSession(room, "guest", clientId);
     this.session = session;
-    session.onStart = ({ game, seed }) => this.launch(session, game, seed);
+    session.onStart = ({ game, seed, games }) => this.launch(session, game, seed, games);
     this.show((add) => {
       this.heading(add, `salle ${code}`);
       add(this.add.text(GAME_WIDTH / 2, 470, "Connexion à la salle…", titleText(48)).setOrigin(0.5));
@@ -185,10 +198,11 @@ export class LobbyScene extends Phaser.Scene {
 
   // ───────────────────────────── start ─────────────────────────────
 
-  private launch(session: OnlineSession, gameId: GameId, seed: number): void {
+  private launch(session: OnlineSession, gameId: GameId, seed: number, games?: GameId[]): void {
     if (this.handedOver || this.session !== session) return;
     this.handedOver = true;
     const config: MatchConfig = { mode: "online", difficulty: "normal", seed, gameId, online: session, onlineAutoplay: this.autoplay, onlineDrift: this.drift };
+    if (games) config.tournament = new Tournament({ games });
     this.scene.start(SceneKeys.Game, config);
   }
 

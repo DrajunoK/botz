@@ -38,3 +38,24 @@ describe("invite links", () => {
     expect(roomFromLink("")).toBeNull();
   });
 });
+
+describe("tournament schedule in start", () => {
+  const wrap = (msg: object) => ({ from: "a", msg });
+  it("keeps a valid schedule", () => {
+    const env = parseEnvelope(wrap({ t: "start", game: "soccer", seed: 1, games: ["soccer", "petanque"] }));
+    expect(env?.msg).toEqual({ t: "start", game: "soccer", seed: 1, games: ["soccer", "petanque"] });
+  });
+  it("rejects an unknown game or an empty schedule", () => {
+    expect(parseEnvelope(wrap({ t: "start", game: "soccer", seed: 1, games: ["nope"] }))).toBeNull();
+    expect(parseEnvelope(wrap({ t: "start", game: "soccer", seed: 1, games: [] }))).toBeNull();
+  });
+});
+
+describe("quick messages", () => {
+  it("accepts a known message and rejects the rest", () => {
+    expect(parseEnvelope({ from: "a", msg: { t: "say", id: 2 } })?.msg).toEqual({ t: "say", id: 2 });
+    expect(parseEnvelope({ from: "a", msg: { t: "say", id: 99 } })).toBeNull();
+    expect(parseEnvelope({ from: "a", msg: { t: "say", id: -1 } })).toBeNull();
+    expect(parseEnvelope({ from: "a", msg: { t: "say", id: 1.5 } })).toBeNull();
+  });
+});

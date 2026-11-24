@@ -30,13 +30,15 @@ export class OnlineSession {
   readonly team: TeamId;
 
   /** Guest: the host's setup arrived. Host: the guest confirmed it. */
-  onStart?: (info: { game: GameId; seed: number }) => void;
+  onStart?: (info: { game: GameId; seed: number; games?: GameId[] }) => void;
   /** Both players asked for a rematch: play again with this seed. */
   onRematch?: (info: { seed: number }) => void;
   onPeerLeft?: (reason: PeerLeftReason) => void;
   /** The opponent's connection dropped: they have DISCONNECT_GRACE_MS to come back. */
   onPeerAway?: () => void;
   onPeerBack?: () => void;
+  /** The opponent sent one of the quick messages. */
+  onSay?: (id: number) => void;
 
   private peerId: string | null = null;
   private others = 0;
@@ -79,8 +81,8 @@ export class OnlineSession {
   // ───────────────────────────── lobby ─────────────────────────────
 
   /** Host: offer this match to whoever joins the room (repeated until the guest confirms). */
-  offerMatch(game: GameId, seed: number): void {
-    this.startMessage = { t: "start", game, seed };
+  offerMatch(game: GameId, seed: number, games?: GameId[]): void {
+    this.startMessage = { t: "start", game, seed, ...(games ? { games } : {}) };
     this.sendStartIfGuestPresent();
   }
 
@@ -138,6 +140,11 @@ export class OnlineSession {
   /** Guest: what the host's world looked like at the end of `turn`, once it has arrived. */
   hostSnapshot(turn: number): number[] | undefined {
     return this.snapshotsByTurn.get(turn);
+  }
+
+  /** Sends a quick message (index into QUICK_MESSAGES); no retry, a lost joke is not worth one. */
+  say(id: number): void {
+    this.send({ t: "say", id });
   }
 
   /** The match just ended: from now on a rematch request counts. */
@@ -216,7 +223,7 @@ export class OnlineSession {
         if (!this.playing) {
           this.playing = true;
           this.beginMatch(msg.seed);
-          this.onStart?.({ game: msg.game, seed: msg.seed });
+          this.onStart?.({ game: msg.game, seed: msg.seed, games: msg.games });
         }
         return;
       case "ready":
@@ -225,7 +232,7 @@ export class OnlineSession {
         this.playing = true;
         this.stopStartTimer();
         this.beginMatch(this.startMessage.seed);
-        this.onStart?.({ game: this.startMessage.game, seed: this.startMessage.seed });
+        this.onStart?.({ game: this.startMessage.game, seed: this.startMessage.seed, games: this.startMessage.games });
         return;
       case "aims":
         if (this.playing && msg.m === this.matchId) this.peerAimsByTurn.set(msg.turn, msg.shots);
@@ -245,6 +252,9 @@ export class OnlineSession {
         return;
       case "go":
         if (this.role === "guest" && this.playing && this.matchOver && this.wantsRematch && msg.seed !== this.matchId) this.startRematch(msg.seed);
+        return;
+      case "say":
+        if (this.playing) this.onSay?.(msg.id);
         return;
       case "leave":
         if (this.playing) this.peerLeft("quit");
